@@ -1199,7 +1199,8 @@ window.__loadIneoFFmpegWASM = (async () => {
           </div>
         </div>
         <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · 720×1280</button>
-        <button class="btn" id="downloadMp4Btn" hidden style="margin-top:8px;width:100%;">⬇ Descargar MP4</button>\n        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker se adapta automáticamente para evitar CORS.</div>
+        <button class="btn" id="downloadMp4Btn" hidden style="margin-top:8px;width:100%;">⬇ Descargar MP4</button>
+        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker se adapta automáticamente para evitar CORS.</div>
       </div>
 
     </aside>
@@ -1317,7 +1318,9 @@ let undoStack = [];
 let exporting = false;
 let cancelExport = false;
 let recorder = null;
-let exportChunks = [];\nlet lastExportBlob = null;\nlet lastExportFilename = "";
+let exportChunks = [];
+let lastExportBlob = null;
+let lastExportFilename = "";
 
 let volume = 1;
 let muted = false;
@@ -1417,7 +1420,7 @@ function isVideo(file){
   );
 }
 
-function handleFile(file){
+window.handleFile = function handleFile(file){
 
   if(!file){
     toast("No se encontró el archivo.");
@@ -4026,5 +4029,24 @@ updateVolume();
 })();
 </script>
 
+<script>
+(function(){
+  function bind(){
+    const input=document.getElementById("fileInput");
+    const status=document.getElementById("status");
+    if(!input || input.dataset.ineoFallbackBound) return;
+    input.dataset.ineoFallbackBound="1";
+    input.addEventListener("change",function(){
+      const file=this.files&&this.files[0];
+      if(!file) return;
+      try{
+        if(typeof window.handleFile==="function") window.handleFile(file);
+        else setTimeout(()=>{ if(typeof window.handleFile==="function") window.handleFile(file); else if(status) status.textContent="Error: el editor no terminó de inicializar."; },0);
+      }catch(err){ console.error("INEOCLIPS: error cargando archivo",err); if(status) status.textContent="Error al cargar: "+(err.message||err); }
+    },true);
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",bind,{once:true}); else bind();
+})();
+</script>
 </body>
 </html>
