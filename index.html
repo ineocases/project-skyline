@@ -3668,7 +3668,7 @@ function makeAudioFilter(){
   if(!segs.length) return null;
   const vol=muted?0:clamp(volume,0,2);
   const parts=segs.map((s,i)=>
-    `[0:a]atrim=start=${s.start.toFixed(4)}:end=${s.end.toFixed(4)},asetpts=PTS-STARTPTS,volume=${vol.toFixed(3)}[a${i}]`
+    `[1:a]atrim=start=${s.start.toFixed(4)}:end=${s.end.toFixed(4)},asetpts=PTS-STARTPTS,volume=${vol.toFixed(3)}[a${i}]`
   );
   if(segs.length===1) return {filter:parts[0]+";[a0]anull[aout]",map:"[aout]"};
   return {
@@ -3777,11 +3777,27 @@ async function startExport(){
 
     args.push("-movflags","+faststart",output);
 
-    await ffmpeg.exec(args);
+    let execCode = await ffmpeg.exec(args);
 
     if(cancelExport) return;
 
-    const data=await ffmpeg.readFile(output);
+    // Some source videos have no audio track. In that case the audio
+    // filter cannot produce the MP4, so retry the exact same render
+    // without audio instead of later failing with an opaque FS error.
+    let data;
+    try {
+      data = await ffmpeg.readFile(output);
+    } catch (readErr) {
+      if (audio) {
+        console.warn("[Export] MP4 con audio no se pudo leer; reintentando sin audio.", readErr);
+        try { await ffmpeg.deleteFile(output); } catch(e) {}
+        const videoOnlyArgs=["-i","render.webm","-map","0:v:0","-r",String(fps),"-s","720x1280","-c:v","libx264","-preset","ultrafast","-b:v",String(bitrate),"-pix_fmt","yuv420p","-an","-movflags","+faststart",output];
+        await ffmpeg.exec(videoOnlyArgs);
+        data = await ffmpeg.readFile(output);
+      } else {
+        throw readErr;
+      }
+    }
     const blob=new Blob([data.buffer],{type:"video/mp4"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
