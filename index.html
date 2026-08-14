@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
 
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+
 <style>
 :root{
   --bg:#0b0b12;
@@ -851,6 +851,68 @@ main{
 @media(max-width:600px){.settingsGrid,.exportSettings{grid-template-columns:1fr}.textToolbar{flex-wrap:wrap}}
 
 </style>
+
+<script>
+/* FFmpeg loader for GitHub Pages:
+   @ffmpeg/ffmpeg UMD normally creates a cross-origin Worker (814.ffmpeg.js).
+   We fetch the wrapper, patch that Worker construction, and import it from
+   a same-origin Blob URL. The FFmpeg core/wasm remain fetched as Blob URLs. */
+window.__loadIneoFFmpegWASM = (async () => {
+  if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) return window.FFmpegWASM;
+
+  const src = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js";
+  const response = await fetch(src, { mode: "cors", cache: "force-cache" });
+  if (!response.ok) throw new Error("No se pudo descargar FFmpeg: " + response.status);
+
+  let code = await response.text();
+
+  // Patch the exact webpack-generated worker construction used by 0.12.10.
+  const patterns = [
+    /new Worker\(new URL\(e\.p\+e\.u\(814\),e\.b\),\{type:void 0\}\)/,
+    /new Worker\(new URL\(e\.p\+e\.u\(814\),e\.b\)\)/
+  ];
+
+  let patched = false;
+  for (const pattern of patterns) {
+    if (pattern.test(code)) {
+      code = code.replace(pattern,
+        'new Worker(URL.createObjectURL(new Blob([\'importScripts("\'+new URL(e.p+e.u(814),e.b).toString()+\'");\'],{type:"text/javascript"})))'
+      );
+      patched = true;
+      break;
+    }
+  }
+
+  if (!patched) {
+    // Fallback for formatting changes: replace the worker constructor around chunk 814.
+    const needle = "new URL(e.p+e.u(814),e.b)";
+    if (code.includes(needle)) {
+      code = code.replace(
+        /new Worker\([^;]*new URL\(e\.p\+e\.u\(814\),e\.b\)[^;]*\)/,
+        'new Worker(URL.createObjectURL(new Blob([\'importScripts("\'+new URL(e.p+e.u(814),e.b).toString()+\'");\'],{type:"text/javascript"})))'
+      );
+      patched = true;
+    }
+  }
+
+  if (!patched) {
+    throw new Error("No se pudo aplicar el parche de Worker de FFmpeg 0.12.10.");
+  }
+
+  const blobURL = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+  try {
+    await import(blobURL);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(blobURL), 30000);
+  }
+
+  if (!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg) {
+    throw new Error("FFmpeg WebAssembly no expuso FFmpegWASM.");
+  }
+  return window.FFmpegWASM;
+})();
+</script>
+
 </head>
 
 <body>
@@ -1158,7 +1220,7 @@ main{
           </div>
         </div>
         <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · 720×1280</button>
-        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar. La primera exportación descarga el motor (~31 MB).</div>
+        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker se adapta automáticamente para evitar CORS.</div>
       </div>
 
     </aside>
@@ -3561,6 +3623,7 @@ async function loadFFmpeg(){
   if(ffmpegLoaded && ffmpegInstance) return ffmpegInstance;
   const statusEl=$("#ffmpegStatus");
   statusEl.textContent="Cargando FFmpeg WebAssembly…";
+  await window.__loadIneoFFmpegWASM;
   if(!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg){
     throw new Error("No se pudo cargar la librería FFmpeg WebAssembly.");
   }
@@ -3922,90 +3985,6 @@ $("#captionsToggle").checked=true;
 
 updateVolume();
 
-})();
-</script>
-
-
-<script>
-/* ineoclips — GitHub Pages safety/autosave layer */
-(() => {
-  const DB_NAME = "ineoclips-studio";
-  const DB_VERSION = 1;
-  const STORE = "projects";
-  let dbPromise;
-
-  function openDB(){
-    if(dbPromise) return dbPromise;
-    dbPromise = new Promise((resolve,reject)=>{
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if(!db.objectStoreNames.contains(STORE)){
-          db.createObjectStore(STORE, {keyPath:"id"});
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    return dbPromise;
-  }
-
-  async function saveProjectSafe(state){
-    try{
-      if(!state) return;
-      const db = await openDB();
-      await new Promise((resolve,reject)=>{
-        const tx = db.transaction(STORE,"readwrite");
-        tx.objectStore(STORE).put({
-          id:"current",
-          savedAt:Date.now(),
-          state
-        });
-        tx.oncomplete=resolve;
-        tx.onerror=()=>reject(tx.error);
-      });
-    }catch(e){
-      console.warn("Autosave:",e);
-    }
-  }
-
-  async function loadProjectSafe(){
-    try{
-      const db = await openDB();
-      return await new Promise((resolve,reject)=>{
-        const tx=db.transaction(STORE,"readonly");
-        const req=tx.objectStore(STORE).get("current");
-        req.onsuccess=()=>resolve(req.result||null);
-        req.onerror=()=>reject(req.error);
-      });
-    }catch(e){ return null; }
-  }
-
-  window.ineoclipsRecovery = {
-    save: saveProjectSafe,
-    load: loadProjectSafe,
-    clear: async () => {
-      try{
-        const db=await openDB();
-        await new Promise((resolve,reject)=>{
-          const tx=db.transaction(STORE,"readwrite");
-          tx.objectStore(STORE).delete("current");
-          tx.oncomplete=resolve;
-          tx.onerror=()=>reject(tx.error);
-        });
-      }catch(e){}
-    }
-  };
-
-  // Save only JSON-safe editor state when the host editor exposes `project`.
-  setInterval(() => {
-    try{
-      if(window.project && typeof window.project === "object"){
-        const clone = JSON.parse(JSON.stringify(window.project));
-        saveProjectSafe(clone);
-      }
-    }catch(e){}
-  }, 3000);
 })();
 </script>
 

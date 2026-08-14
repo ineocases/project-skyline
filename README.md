@@ -1,14 +1,13 @@
-# ineoclips Studio
+# ineoclips Studio — GitHub Pages
 
-Editor de video vertical 9:16 pensado para GitHub Pages.
+Subí estos archivos a la raíz del repositorio:
 
-## Uso
+- `index.html`
+- `.nojekyll`
+- `README.md`
 
-1. Subir el contenido del repositorio a GitHub.
-2. Activar GitHub Pages desde la rama `main`, carpeta `/root`.
-3. Abrir la URL HTTPS de GitHub Pages.
-4. Cargar un video y editar.
+La exportación MP4 usa FFmpeg WebAssembly. El cargador adapta el Worker de `@ffmpeg/ffmpeg@0.12.10` para evitar el error de Chrome al crear directamente `814.ffmpeg.js` desde otro origen.
 
-> La exportación FFmpeg WebAssembly debe ejecutarse desde HTTPS/GitHub Pages, no desde `file://`.
+**Abrir desde GitHub Pages (`https://...github.io/...`)**, no desde `file://`.
 
-El editor guarda periódicamente el estado del proyecto en IndexedDB del navegador para evitar perder el trabajo si una exportación falla.
+El editor conserva el estado del proyecto y no debe destruir la edición si la exportación falla.
