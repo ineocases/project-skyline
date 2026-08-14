@@ -1,0 +1,4013 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ineoclips — editor de video</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/space-grotesk@latest/latin-500-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/space-grotesk@latest/latin-700-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<style>
+:root{
+  --bg:#0b0b12;
+  --panel:#13131d;
+  --panel2:#1a1a27;
+  --line:#29293d;
+  --txt:#f4f4fa;
+  --mut:#9898ae;
+  --vio:#8b5cf6;
+  --vio2:#d946ef;
+  --cyan:#22d3ee;
+  --lime:#d8ff3e;
+  --red:#f87171;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+
+body{
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--txt);
+  font-family:Inter,Arial,sans-serif;
+  font-size:14px;
+}
+
+button,input{font:inherit}
+button{cursor:pointer}
+h1,h2,h3,h4,.logo{font-family:"Space Grotesk",sans-serif}
+
+.topbar{
+  height:62px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 26px;
+  border-bottom:1px solid var(--line);
+  background:rgba(11,11,18,.9);
+  backdrop-filter:blur(14px);
+  position:sticky;
+  top:0;
+  z-index:100;
+}
+
+.logo{
+  font-size:21px;
+  font-weight:700;
+}
+.logo b{color:var(--lime)}
+.studio{
+  color:var(--mut);
+  font-size:10px;
+  letter-spacing:2px;
+  margin-left:7px;
+}
+
+.badge{
+  color:var(--lime);
+  border:1px solid rgba(216,255,62,.3);
+  background:rgba(216,255,62,.06);
+  border-radius:99px;
+  padding:6px 12px;
+  font-size:11px;
+}
+
+main{
+  max-width:1450px;
+  margin:auto;
+  padding:24px 26px 70px;
+}
+
+.screen{animation:fade .25s ease}
+
+@keyframes fade{
+  from{opacity:0;transform:translateY(7px)}
+  to{opacity:1;transform:none}
+}
+
+.hero{
+  max-width:800px;
+  margin:50px auto 30px;
+  text-align:center;
+}
+
+.hero h1{
+  font-size:clamp(30px,5vw,52px);
+  line-height:1.08;
+  letter-spacing:-1.5px;
+}
+
+.hero h1 span{
+  background:linear-gradient(90deg,var(--cyan),var(--vio),var(--lime));
+  -webkit-background-clip:text;
+  color:transparent;
+}
+
+.hero p{
+  color:var(--mut);
+  line-height:1.6;
+  margin-top:16px;
+}
+
+.import{
+  max-width:680px;
+  margin:auto;
+}
+
+.dropzone{
+  display:block;
+  padding:42px 25px;
+  border:2px dashed #35354f;
+  border-radius:22px;
+  background:var(--panel);
+  text-align:center;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.dropzone:hover,
+.dropzone.over{
+  border-color:var(--vio);
+  background:#171522;
+}
+
+.dropicon{
+  font-size:55px;
+  display:block;
+  margin-bottom:12px;
+}
+
+.dropzone strong{font-size:15px}
+.dropzone small{
+  display:block;
+  color:var(--mut);
+  margin-top:9px;
+}
+
+.importButtons{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+
+.fileNative{
+  margin-top:13px;
+  text-align:center;
+  color:var(--mut);
+  font-size:11px;
+}
+
+.fileNative input{max-width:100%}
+
+.status{
+  text-align:center;
+  color:var(--mut);
+  font-size:12px;
+  min-height:18px;
+  margin-top:10px;
+}
+
+.btn{
+  border:0;
+  border-radius:11px;
+  padding:10px 15px;
+  font-size:13px;
+  font-weight:600;
+  transition:.15s;
+}
+
+.btn:hover{filter:brightness(1.12)}
+.btn.primary{
+  color:white;
+  background:linear-gradient(90deg,var(--vio),var(--vio2));
+}
+.btn.ghost{
+  color:var(--txt);
+  background:transparent;
+  border:1px solid var(--line);
+}
+.btn.danger{
+  color:var(--red);
+}
+
+.steps{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  margin-top:45px;
+}
+
+.step{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:18px;
+}
+.step b{
+  color:var(--lime);
+  font-size:11px;
+  letter-spacing:2px;
+}
+.step h3{font-size:15px;margin:8px 0 6px}
+.step p{
+  color:var(--mut);
+  font-size:12px;
+  line-height:1.5;
+}
+
+/* EDITOR */
+
+.editorHead{
+  display:flex;
+  align-items:center;
+  gap:15px;
+  margin-bottom:17px;
+  flex-wrap:wrap;
+}
+
+.editorTitle h2{font-size:19px}
+.editorTitle p{
+  color:var(--mut);
+  font-size:11px;
+  margin-top:3px;
+}
+
+.layouts{
+  margin-left:auto;
+  display:flex;
+  gap:4px;
+  padding:4px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  border-radius:12px;
+  flex-wrap:wrap;
+}
+
+.layouts button{
+  border:0;
+  color:var(--mut);
+  background:transparent;
+  border-radius:8px;
+  padding:8px 12px;
+  font-size:11px;
+  font-weight:600;
+}
+
+.layouts button.active{
+  color:#05262d;
+  background:var(--cyan);
+}
+
+.editorActions{
+  display:flex;
+  gap:7px;
+}
+
+.editorBody{
+  display:flex;
+  gap:17px;
+  align-items:flex-start;
+}
+
+.left{
+  flex:1;
+  min-width:0;
+}
+
+.source{
+  position:relative;
+  margin:auto;
+  background:#000;
+  border:1px solid var(--line);
+  border-radius:15px;
+  overflow:hidden;
+}
+
+.source video{
+  width:100%;
+  height:100%;
+  display:block;
+}
+
+.overlay{
+  position:absolute;
+  inset:0;
+}
+
+.crop{
+  position:absolute;
+  border:2px solid var(--cyan);
+  box-shadow:0 0 18px rgba(0,0,0,.6);
+  cursor:move;
+}
+
+.crop:nth-child(2){border-color:#4ade80}
+.crop:nth-child(3){border-color:#c084fc}
+
+.cropLabel{
+  position:absolute;
+  top:5px;
+  left:5px;
+  color:#fff;
+  background:rgba(0,0,0,.65);
+  border-radius:5px;
+  padding:2px 7px;
+  font-size:9px;
+  font-weight:700;
+  pointer-events:none;
+}
+
+.cropZoom{
+  position:absolute;
+  top:5px;
+  right:5px;
+  color:#fff;
+  background:rgba(0,0,0,.7);
+  border-radius:5px;
+  padding:2px 6px;
+  font-size:9px;
+  pointer-events:none;
+}
+
+.handle{
+  position:absolute;
+  width:13px;
+  height:13px;
+  border:2px solid #000;
+  background:var(--cyan);
+  border-radius:4px;
+}
+
+.handle.nw{left:-8px;top:-8px;cursor:nwse-resize}
+.handle.ne{right:-8px;top:-8px;cursor:nesw-resize}
+.handle.sw{left:-8px;bottom:-8px;cursor:nesw-resize}
+.handle.se{right:-8px;bottom:-8px;cursor:nwse-resize}
+
+.transport{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  margin-top:13px;
+  padding:10px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  border-radius:14px;
+  flex-wrap:wrap;
+}
+
+.tbtn{
+  border:1px solid var(--line);
+  background:var(--panel2);
+  color:var(--txt);
+  border-radius:9px;
+  padding:8px 11px;
+}
+
+.tbtn:hover{border-color:var(--vio)}
+
+.play{
+  background:var(--cyan);
+  color:#06272e;
+  border:0;
+  font-weight:700;
+  width:42px;
+}
+
+.time{
+  color:var(--mut);
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+  margin-left:4px;
+}
+
+.spacer{flex:1}
+
+.volume{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding-left:5px;
+}
+
+.volume input{
+  width:105px;
+  accent-color:var(--cyan);
+}
+
+.timeline{
+  margin-top:13px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:15px;
+  padding:13px;
+}
+
+.timelineHead{
+  display:flex;
+  align-items:center;
+  margin-bottom:8px;
+}
+
+.timelineHead span{
+  color:var(--mut);
+  font-size:10px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+
+.ruler{
+  height:20px;
+  position:relative;
+  overflow:hidden;
+}
+
+.tick{
+  position:absolute;
+  top:0;
+  color:var(--mut);
+  font-size:9px;
+}
+
+.tick:after{
+  content:"";
+  position:absolute;
+  top:13px;
+  left:0;
+  height:6px;
+  width:1px;
+  background:#44445b;
+}
+
+.track{
+  position:relative;
+  height:78px;
+  overflow:hidden;
+  background:#0e0e17;
+  border:1px solid var(--line);
+  border-radius:11px;
+  cursor:crosshair;
+}
+
+.segment{
+  position:absolute;
+  top:7px;
+  bottom:7px;
+  border-radius:8px;
+  background:var(--seg);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.08);
+  cursor:pointer;
+}
+
+.segment.selected{
+  box-shadow:inset 0 0 0 2px var(--lime);
+}
+
+.segText{
+  position:absolute;
+  left:6px;
+  top:6px;
+  font-size:9px;
+  font-weight:700;
+  color:white;
+  background:rgba(0,0,0,.45);
+  padding:2px 5px;
+  border-radius:4px;
+}
+
+.trim{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:13px;
+  display:none;
+  z-index:3;
+}
+
+.trim.left{left:0}
+.trim.right{right:0}
+.trim:after{
+  content:"";
+  position:absolute;
+  top:25%;
+  bottom:25%;
+  left:5px;
+  width:3px;
+  background:var(--lime);
+  border-radius:4px;
+}
+
+.segment.selected .trim{display:block}
+
+.playhead{
+  position:absolute;
+  width:2px;
+  top:0;
+  bottom:0;
+  background:var(--lime);
+  z-index:10;
+  pointer-events:none;
+}
+
+.playhead:before{
+  content:"";
+  position:absolute;
+  left:-5px;
+  top:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:9px solid var(--lime);
+}
+
+.keyMarker{
+  position:absolute;
+  top:48px;
+  width:0;
+  height:0;
+  border-left:5px solid transparent;
+  border-right:5px solid transparent;
+  border-bottom:9px solid var(--lime);
+  transform:translateX(-5px);
+  z-index:8;
+  cursor:pointer;
+}
+
+.keyMarker:hover{
+  filter:brightness(1.4);
+}
+
+/* SIDE */
+
+.side{
+  width:350px;
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  position:sticky;
+  top:76px;
+  align-self:flex-start;
+  max-height:calc(100vh - 92px);
+  overflow:auto;
+  padding-right:3px;
+  scrollbar-width:thin;
+}
+
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+
+.inspectorTabs{
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:5px;
+  padding:5px;
+  background:rgba(11,11,18,.94);
+  border:1px solid var(--line);
+  border-radius:11px;
+  backdrop-filter:blur(12px);
+}
+
+.inspectorTab{
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--mut);
+  border-radius:8px;
+  padding:8px 5px;
+  font-size:10px;
+  font-weight:700;
+}
+
+.inspectorTab:hover{color:var(--txt);background:var(--panel2)}
+.inspectorTab.active{
+  color:var(--txt);
+  background:var(--panel2);
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px rgba(34,211,238,.08) inset;
+}
+
+.inspectorPanel[hidden]{display:none!important}
+
+.keyButtons .btn{min-height:34px}
+
+.block{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px;
+}
+
+.block h4{
+  color:var(--mut);
+  font-size:10px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:11px;
+}
+
+.preview{
+  display:flex;
+  justify-content:center;
+  background:#000;
+  padding:13px;
+  border-radius:11px;
+  border:1px solid var(--line);
+}
+
+#preview{
+  width:220px;
+  display:block;
+  border-radius:8px;
+}
+
+.control{
+  display:grid;
+  grid-template-columns:55px 1fr 62px;
+  gap:8px;
+  align-items:center;
+  margin:10px 0;
+}
+
+.control label{
+  color:var(--mut);
+  font-size:11px;
+}
+
+.control input[type=range]{
+  width:100%;
+  accent-color:var(--cyan);
+}
+
+.number{
+  width:100%;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  color:white;
+  border-radius:7px;
+  padding:5px;
+  font-size:11px;
+  text-align:center;
+}
+
+.keyButtons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-top:11px;
+}
+
+.switchRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 0;
+  font-size:12px;
+}
+
+.switch{
+  position:relative;
+  width:38px;
+  height:21px;
+}
+
+.switch input{display:none}
+
+.switch span{
+  position:absolute;
+  inset:0;
+  border:1px solid var(--line);
+  background:var(--panel2);
+  border-radius:99px;
+}
+
+.switch span:after{
+  content:"";
+  position:absolute;
+  width:13px;
+  height:13px;
+  left:3px;
+  top:3px;
+  background:var(--mut);
+  border-radius:50%;
+  transition:.2s;
+}
+
+.switch input:checked+span{
+  background:rgba(34,211,238,.2);
+  border-color:var(--cyan);
+}
+
+.switch input:checked+span:after{
+  left:20px;
+  background:var(--cyan);
+}
+
+.volumeBig{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.volumeBig input{
+  flex:1;
+  accent-color:var(--cyan);
+}
+
+.volumeValue{
+  width:45px;
+  text-align:right;
+  color:var(--mut);
+  font-size:11px;
+}
+
+.hint{
+  color:var(--mut);
+  font-size:10px;
+  line-height:1.5;
+  margin-top:9px;
+}
+
+.exportBtn{
+  width:100%;
+  margin-top:10px;
+}
+
+/* overlays */
+
+.dropOverlay,
+.exportOverlay{
+  position:fixed;
+  inset:0;
+  z-index:500;
+  background:rgba(5,5,10,.85);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.dropMessage{
+  border:3px dashed var(--cyan);
+  padding:50px 70px;
+  border-radius:22px;
+  color:var(--cyan);
+  font:700 24px "Space Grotesk";
+  background:rgba(34,211,238,.06);
+}
+
+.modal{
+  width:min(420px,90vw);
+  padding:30px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:20px;
+  text-align:center;
+}
+
+.modal h3{margin-bottom:17px}
+
+.progress{
+  height:8px;
+  background:var(--panel2);
+  border-radius:99px;
+  overflow:hidden;
+}
+
+.progress div{
+  width:0;
+  height:100%;
+  background:linear-gradient(90deg,var(--cyan),var(--lime));
+}
+
+.modal p{
+  color:var(--mut);
+  margin:10px 0 16px;
+  font-size:12px;
+}
+
+.toasts{
+  position:fixed;
+  z-index:800;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+
+.toast{
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-left:3px solid var(--cyan);
+  border-radius:9px;
+  padding:10px 15px;
+  box-shadow:0 10px 30px #0008;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+@media(max-width:1050px){
+  .editorBody{flex-direction:column}
+  .side{width:100%;position:static;max-height:none;overflow:visible}
+  .steps{grid-template-columns:1fr}
+}
+
+@media(max-width:600px){
+  main{padding:15px}
+  .layouts{margin-left:0}
+  .editorHead{align-items:flex-start}
+  .volume input{width:70px}
+}
+
+/* ============================================================
+   INEOCLIPS PRO CONTROLS
+============================================================ */
+.settingsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.field input,.field select,.field textarea{
+  width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--txt);
+  border-radius:8px;padding:7px;font-size:11px;outline:none
+}
+.field textarea{min-height:62px;resize:vertical}
+.field input[type=color]{height:34px;padding:2px}
+.textToolbar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.textList{display:flex;gap:5px;overflow:auto;padding-bottom:6px}
+.textChip{border:1px solid var(--line);background:var(--panel2);color:var(--mut);border-radius:8px;padding:6px 8px;font-size:10px;white-space:nowrap}
+.textChip.active{border-color:var(--cyan);color:var(--cyan)}
+.textActions{display:flex;gap:6px;margin-top:8px}
+.exportSettings{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.exportSettings select{width:100%;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:8px;padding:7px;font-size:11px}
+.ffmpegStatus{font-size:10px;color:var(--mut);margin-top:8px;line-height:1.45}
+.textLayerHint{margin-top:6px;color:var(--mut);font-size:9px;line-height:1.4}
+@media(max-width:600px){.settingsGrid,.exportSettings{grid-template-columns:1fr}.textToolbar{flex-wrap:wrap}}
+
+</style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <div class="logo">ineoclips<b>.</b><span class="studio">STUDIO</span></div>
+  <div class="badge">● MODO LOCAL</div>
+</header>
+
+<main>
+
+<!-- IMPORT -->
+
+<section id="importScreen" class="screen">
+
+  <div class="hero">
+    <h1>Tu video. <span>Tu edición.</span></h1>
+    <p>
+      Dividí pantallas, animá posiciones, agregá zoom, keyframes,
+      subtítulos y exportá tu clip vertical.
+    </p>
+  </div>
+
+  <div class="import">
+
+    <label class="dropzone" id="dropzone" for="fileInput">
+      <span class="dropicon">🎬</span>
+      <strong>Soltá tu video acá o hacé clic para buscarlo</strong>
+      <small>MP4 · MOV · WEBM · M4V — procesamiento local</small>
+    </label>
+
+    <div class="importButtons">
+      <label class="btn primary" for="fileInput">📁 Elegir video</label>
+      <button class="btn ghost" id="demoBtn">✨ Video demo</button>
+    </div>
+
+    <div class="fileNative">
+      Selector directo:
+      <input id="fileInput" type="file" accept="video/*,.mp4,.mov,.webm,.m4v,.mkv,.avi,.ogv">
+    </div>
+
+    <div class="status" id="status">Listo para cargar.</div>
+
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <b>01</b>
+      <h3>Elegí el layout</h3>
+      <p>Vertical, dividido, trío, spotlight u horizontal.</p>
+    </div>
+    <div class="step">
+      <b>02</b>
+      <h3>Animá tu clip</h3>
+      <p>Mové, escalá y agregá keyframes para crear movimientos.</p>
+    </div>
+    <div class="step">
+      <b>03</b>
+      <h3>Exportá</h3>
+      <p>Preview 9:16 con subtítulos, audio y todos los movimientos.</p>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- EDITOR -->
+
+<section id="editorScreen" class="screen" hidden>
+
+  <div class="editorHead">
+
+    <div class="editorTitle">
+      <h2>ineoclips · editor</h2>
+      <p>Arrastrá · escalá · agregá keyframes · editá la timeline</p>
+    </div>
+
+    <div class="layouts" id="layouts">
+      <button data-layout="vertical">Vertical</button>
+      <button data-layout="dividido" class="active">Dividido</button>
+      <button data-layout="trio">Trío</button>
+      <button data-layout="centrado">Spotlight</button>
+      <button data-layout="horizontal">Horizontal</button>
+    </div>
+
+    <div class="editorActions">
+      <button class="btn ghost" id="undoBtn">↩ Deshacer</button>
+      <button class="btn ghost" id="newBtn">＋ Nuevo</button>
+    </div>
+
+  </div>
+
+
+  <div class="editorBody">
+
+    <div class="left">
+
+      <div class="source" id="source">
+        <video id="video" playsinline preload="auto"></video>
+        <div class="overlay" id="overlay"></div>
+      </div>
+
+
+      <div class="transport">
+
+        <button class="tbtn" id="prevBtn">⏮</button>
+
+        <button class="tbtn play" id="playBtn">▶</button>
+
+        <button class="tbtn" id="nextBtn">⏭</button>
+
+        <span class="time" id="time">00:00 / 00:00</span>
+
+        <span class="spacer"></span>
+
+        <div class="volume">
+          <span id="volumeIcon">🔊</span>
+          <input id="volumeTransport" type="range" min="0" max="200" value="100">
+        </div>
+
+        <button class="tbtn" id="splitBtn">✂ Cortar <small>S</small></button>
+
+        <button class="tbtn" id="deleteBtn">🗑</button>
+
+      </div>
+
+
+      <div class="timeline">
+
+        <div class="timelineHead">
+          <span>Timeline</span>
+          <span class="spacer"></span>
+          <button class="btn ghost" id="moveLeft">◀</button>
+          <button class="btn ghost" id="moveRight">▶</button>
+        </div>
+
+        <div class="ruler" id="ruler"></div>
+
+        <div class="track" id="track">
+          <div id="segments"></div>
+          <div id="playhead" class="playhead"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <aside class="side">
+
+      <!-- PREVIEW -->
+
+      <div class="block">
+
+        <h4>Vista previa · 9:16</h4>
+
+        <div class="preview">
+          <canvas id="preview" width="360" height="640"></canvas>
+        </div>
+
+        <div class="switchRow">
+          <span>Subtítulos</span>
+          <label class="switch">
+            <input type="checkbox" id="captionsToggle" checked>
+            <span></span>
+          </label>
+        </div>
+
+        <div class="switchRow">
+          <span>Marca</span>
+          <label class="switch">
+            <input type="checkbox" id="brandToggle">
+            <span></span>
+          </label>
+        </div>
+
+      </div>
+
+      <div class="inspectorTabs" id="inspectorTabs">
+        <button class="inspectorTab active" data-panel="transform">🎯 Video</button>
+        <button class="inspectorTab" data-panel="text">📝 Texto</button>
+        <button class="inspectorTab" data-panel="audio">🔊 Audio</button>
+        <button class="inspectorTab" data-panel="export">⬇ Exportar</button>
+      </div>
+
+
+      <!-- TRANSFORM -->
+
+      <div class="block inspectorPanel" data-panel-section="transform">
+
+        <h4>Transformación</h4>
+
+        <div class="control">
+          <label>X</label>
+          <input id="xRange" type="range" min="0" max="100" step=".1">
+          <input id="xNumber" class="number" type="number" step=".1">
+        </div>
+
+        <div class="control">
+          <label>Y</label>
+          <input id="yRange" type="range" min="0" max="100" step=".1">
+          <input id="yNumber" class="number" type="number" step=".1">
+        </div>
+
+        <div class="control">
+          <label>Escala</label>
+          <input id="scaleRange" type="range" min="50" max="500" step="1">
+          <input id="scaleNumber" class="number" type="number" step=".01">
+        </div>
+
+        <button class="btn ghost" id="resetTransform" style="width:100%">
+          ↺ Restablecer transformación
+        </button>
+
+        <div class="keyButtons">
+          <button class="btn primary" id="addKeyframe">◆ Keyframe</button>
+          <button class="btn ghost" id="deleteKeyframe">🗑 Keyframe</button>
+        </div>
+
+        <div class="switchRow">
+          <span>Auto Keyframe</span>
+          <label class="switch">
+            <input type="checkbox" id="autoKeyframe" checked>
+            <span></span>
+          </label>
+        </div>
+
+        <div class="hint">
+          Creá el primer keyframe, mové el playhead y seguí moviendo o escalando.
+          Con Auto Keyframe, cada cambio crea/actualiza el siguiente punto automáticamente.
+        </div>
+
+      </div>
+
+
+      <!-- AUDIO -->
+
+      <div class="block inspectorPanel" data-panel-section="audio">
+
+        <h4>Audio</h4>
+
+        <div class="volumeBig">
+          <span id="sideVolumeIcon">🔊</span>
+          <input id="volumeSide" type="range" min="0" max="200" value="100">
+          <span class="volumeValue" id="volumeValue">100%</span>
+        </div>
+
+        <div class="switchRow">
+          <span>Mute</span>
+          <label class="switch">
+            <input type="checkbox" id="muteToggle">
+            <span></span>
+          </label>
+        </div>
+
+      </div>
+
+
+
+      <!-- TEXTOS PERSONALIZADOS -->
+      <div class="block inspectorPanel" data-panel-section="text">
+        <h4>Textos</h4>
+        <div class="textToolbar">
+          <button class="btn primary" id="addTextBtn">＋ Texto</button>
+          <button class="btn ghost" id="deleteTextBtn">🗑</button>
+        </div>
+        <div class="textList" id="textList"></div>
+        <div class="settingsGrid">
+          <div class="field" style="grid-column:1/-1">
+            <label>Contenido</label>
+            <textarea id="textContent" placeholder="Escribí tu texto…"></textarea>
+          </div>
+          <div class="field"><label>Inicio (s)</label><input id="textStart" type="number" min="0" step=".1" value="0"></div>
+          <div class="field"><label>Fin (s)</label><input id="textEnd" type="number" min="0" step=".1" value="2"></div>
+          <div class="field"><label>X (%)</label><input id="textX" type="number" min="0" max="100" step=".1" value="50"></div>
+          <div class="field"><label>Y (%)</label><input id="textY" type="number" min="0" max="100" step=".1" value="85"></div>
+          <div class="field"><label>Tamaño</label><input id="textSize" type="number" min="8" max="240" step="1" value="44"></div>
+          <div class="field"><label>Color</label><input id="textColor" type="color" value="#ffffff"></div>
+          <div class="field"><label>Estilo</label>
+            <select id="textStyle"><option value="normal">Normal</option><option value="bold" selected>Negrita</option><option value="italic">Cursiva</option><option value="bold italic">Negrita + cursiva</option></select>
+          </div>
+          <div class="field"><label>Alineación</label>
+            <select id="textAlign"><option value="left">Izquierda</option><option value="center" selected>Centro</option><option value="right">Derecha</option></select>
+          </div>
+        </div>
+        <div class="textActions">
+          <button class="btn ghost" id="textApplyBtn" style="flex:1">Aplicar</button>
+        </div>
+        <div class="textLayerHint">Podés crear múltiples textos independientes con duración, posición, tamaño, color y estilo propios.</div>
+      </div>
+
+      <div class="block inspectorPanel" data-panel-section="export">
+        <h4>Exportación</h4>
+        <div class="exportSettings">
+          <div class="field"><label>FPS</label>
+            <select id="fpsSelect"><option value="24">24 FPS</option><option value="30" selected>30 FPS</option><option value="60">60 FPS</option></select>
+          </div>
+          <div class="field"><label>Calidad / bitrate</label>
+            <select id="qualitySelect">
+              <option value="3500000">Baja · 3.5 Mbps</option>
+              <option value="6000000" selected>Media · 6 Mbps</option>
+              <option value="9000000">Alta · 9 Mbps</option>
+              <option value="14000000">Máxima · 14 Mbps</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · 720×1280</button>
+        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar. La primera exportación descarga el motor (~31 MB).</div>
+      </div>
+
+    </aside>
+
+  </div>
+
+</section>
+
+</main>
+
+
+<!-- DROP -->
+
+<div class="dropOverlay" id="dropOverlay" hidden>
+  <div class="dropMessage">⬇ Soltá el video en ineoclips</div>
+</div>
+
+
+<!-- EXPORT -->
+
+<div class="exportOverlay" id="exportOverlay" hidden>
+
+  <div class="modal">
+
+    <h3>Renderizando… 🎬</h3>
+
+    <div class="progress">
+      <div id="progressBar"></div>
+    </div>
+
+    <p id="progressText">0%</p>
+
+    <button class="btn ghost" id="cancelExport">
+      Cancelar
+    </button>
+
+  </div>
+
+</div>
+
+
+<div class="toasts" id="toasts"></div>
+
+<canvas id="exportCanvas" hidden></canvas>
+
+
+<script>
+(function(){
+
+"use strict";
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+const $ = s => document.querySelector(s);
+
+const importScreen = $("#importScreen");
+const editorScreen = $("#editorScreen");
+
+const fileInput = $("#fileInput");
+const dropzone = $("#dropzone");
+const demoBtn = $("#demoBtn");
+const status = $("#status");
+
+const video = $("#video");
+const source = $("#source");
+const overlay = $("#overlay");
+
+const preview = $("#preview");
+const pctx = preview.getContext("2d");
+
+const exportCanvas = $("#exportCanvas");
+
+const ruler = $("#ruler");
+const track = $("#track");
+const segmentsEl = $("#segments");
+const playheadEl = $("#playhead");
+
+const timeEl = $("#time");
+const playBtn = $("#playBtn");
+
+const dropOverlay = $("#dropOverlay");
+const toasts = $("#toasts");
+
+const exportOverlay = $("#exportOverlay");
+const progressBar = $("#progressBar");
+const progressText = $("#progressText");
+
+let sourceURL = null;
+let sourceName = "";
+let sourceBlob = null;
+let duration = 0;
+
+let ffmpegInstance = null;
+let ffmpegLoaded = false;
+
+let project = null;
+
+let layout = "dividido";
+
+let selectedSegment = 0;
+let selectedScreen = 0;
+
+let playhead = 0;
+let playing = false;
+let lastFrame = 0;
+
+let pps = 60;
+
+let dragging = false;
+
+let undoStack = [];
+
+let exporting = false;
+let cancelExport = false;
+let recorder = null;
+let exportChunks = [];
+
+let volume = 1;
+let muted = false;
+
+const COLORS = [
+  "#22d3ee",
+  "#4ade80",
+  "#c084fc"
+];
+
+const LABELS = {
+  vertical:["Full"],
+  dividido:["Top","Bottom"],
+  trio:["Top","Mid","Bottom"],
+  centrado:["Centro"],
+  horizontal:["Wide"]
+};
+
+const PHRASES = [
+  "esto es lo que nadie te cuenta",
+  "espera a ver esto",
+  "esto cambia todo",
+  "no vas a creer lo que pasó",
+  "atención a esta parte",
+  "acá empieza lo bueno",
+  "mirá lo que pasó",
+  "nadie lo vio venir"
+];
+
+
+/* ============================================================
+   UTILIDADES
+============================================================ */
+
+function clamp(v,a,b){
+  return Math.max(a,Math.min(b,v));
+}
+
+function lerp(a,b,t){
+  return a+(b-a)*t;
+}
+
+function fmt(t){
+  t=Math.max(0,t||0);
+  const m=Math.floor(t/60);
+  const s=Math.floor(t%60);
+  return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+}
+
+function toast(text){
+  const el=document.createElement("div");
+  el.className="toast";
+  el.textContent=text;
+  toasts.appendChild(el);
+
+  setTimeout(()=>{
+    el.style.opacity="0";
+    el.style.transition=".25s";
+    setTimeout(()=>el.remove(),300);
+  },2600);
+}
+
+function safeSeek(t){
+  if(!video.duration || !isFinite(video.duration)) return;
+
+  try{
+    video.currentTime=clamp(
+      t,
+      0,
+      Math.max(0,video.duration-.01)
+    );
+  }catch(e){}
+}
+
+function getAspect(){
+  if(video.videoWidth && video.videoHeight){
+    return video.videoHeight/video.videoWidth;
+  }
+  return 9/16;
+}
+
+
+/* ============================================================
+   IMPORTACIÓN — CORREGIDA
+============================================================ */
+
+function isVideo(file){
+
+  if(!file) return false;
+
+  if(file.type && file.type.startsWith("video/")){
+    return true;
+  }
+
+  return /\.(mp4|mov|webm|m4v|mkv|avi|ogv|3gp)$/i.test(
+    file.name||""
+  );
+}
+
+function handleFile(file){
+
+  if(!file){
+    toast("No se encontró el archivo.");
+    return;
+  }
+
+  if(!isVideo(file)){
+    toast("El archivo no parece ser un video.");
+    status.textContent="Archivo no válido.";
+    return;
+  }
+
+  status.textContent="Cargando "+file.name+"…";
+
+  if(sourceURL){
+    try{
+      URL.revokeObjectURL(sourceURL);
+    }catch(e){}
+  }
+
+  sourceBlob=file;
+  sourceURL=URL.createObjectURL(file);
+  sourceName=file.name;
+
+  loadVideo(sourceURL);
+}
+
+function loadVideo(url){
+
+  let finished=false;
+
+  const timeout=setTimeout(()=>{
+    if(finished) return;
+
+    finished=true;
+
+    video.removeEventListener("loadedmetadata",metadata);
+    video.removeEventListener("error",error);
+
+    toast("El video tardó demasiado en cargar.");
+    status.textContent="No se pudo cargar el video.";
+  },30000);
+
+
+  function metadata(){
+
+    if(finished) return;
+
+    if(!isFinite(video.duration) || video.duration<=0){
+      return;
+    }
+
+    finished=true;
+    clearTimeout(timeout);
+
+    video.removeEventListener("loadedmetadata",metadata);
+    video.removeEventListener("error",error);
+
+    duration=video.duration;
+
+    project={
+      segments:[
+        {
+          start:0,
+          end:duration
+        }
+      ],
+
+      screens:[],
+
+      captions:[],
+
+      texts:[],
+
+      seed:Math.floor(Math.random()*99999)
+    };
+
+    selectedSegment=0;
+    selectedScreen=0;
+    playhead=0;
+    undoStack=[];
+
+    buildCaptions();
+
+    importScreen.hidden=true;
+    editorScreen.hidden=false;
+
+    setTimeout(()=>{
+
+      fitSource();
+
+      setLayout("dividido");
+
+      project.texts=project.texts||[];
+      selectedTextId=null;
+      renderTextList();
+      rebuild();
+
+      seek(0);
+
+      updateVolume();
+
+      toast("Video cargado correctamente.");
+
+    },80);
+  }
+
+
+  function error(){
+
+    if(finished) return;
+
+    finished=true;
+    clearTimeout(timeout);
+
+    toast("El navegador no pudo decodificar este video.");
+    status.textContent="Error al decodificar.";
+  }
+
+
+  video.addEventListener("loadedmetadata",metadata);
+  video.addEventListener("error",error);
+
+  video.src=url;
+  video.load();
+}
+
+
+/* ============================================================
+   INPUT
+============================================================ */
+
+fileInput.addEventListener("change",e=>{
+
+  const file=e.target.files && e.target.files[0];
+
+  if(file) handleFile(file);
+
+  fileInput.value="";
+});
+
+
+dropzone.addEventListener("dragover",e=>{
+  e.preventDefault();
+  dropzone.classList.add("over");
+});
+
+dropzone.addEventListener("dragleave",()=>{
+  dropzone.classList.remove("over");
+});
+
+dropzone.addEventListener("drop",e=>{
+
+  e.preventDefault();
+
+  dropzone.classList.remove("over");
+
+  const file=e.dataTransfer.files[0];
+
+  if(file) handleFile(file);
+});
+
+
+let dragDepth=0;
+
+window.addEventListener("dragenter",e=>{
+
+  e.preventDefault();
+
+  dragDepth++;
+
+  if(importScreen.hidden===false){
+    dropOverlay.hidden=false;
+  }
+});
+
+window.addEventListener("dragleave",e=>{
+
+  e.preventDefault();
+
+  dragDepth=Math.max(0,dragDepth-1);
+
+  if(dragDepth===0){
+    dropOverlay.hidden=true;
+  }
+});
+
+window.addEventListener("dragover",e=>{
+  e.preventDefault();
+});
+
+window.addEventListener("drop",e=>{
+
+  e.preventDefault();
+
+  dragDepth=0;
+  dropOverlay.hidden=true;
+
+  const file=e.dataTransfer.files[0];
+
+  if(!file) return;
+
+  if(!importScreen.hidden){
+    handleFile(file);
+  }
+});
+
+
+/* ============================================================
+   DEMO
+============================================================ */
+
+demoBtn.addEventListener("click",()=>{
+
+  if(!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream){
+    toast("Tu navegador no soporta el video demo.");
+    return;
+  }
+
+  const c=document.createElement("canvas");
+
+  c.width=1280;
+  c.height=720;
+
+  const ctx=c.getContext("2d");
+
+  const stream=c.captureStream(30);
+
+  const types=[
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm"
+  ];
+
+  let mime="video/webm";
+
+  for(const type of types){
+
+    if(MediaRecorder.isTypeSupported(type)){
+      mime=type;
+      break;
+    }
+  }
+
+  const rec=new MediaRecorder(stream,{mimeType:mime});
+
+  const chunks=[];
+
+  rec.ondataavailable=e=>{
+    if(e.data.size) chunks.push(e.data);
+  };
+
+  rec.onstop=()=>{
+
+    const blob=new Blob(chunks,{type:"video/webm"});
+    sourceBlob=blob;
+
+    if(sourceURL){
+      try{URL.revokeObjectURL(sourceURL)}catch(e){}
+    }
+
+    sourceURL=URL.createObjectURL(blob);
+    sourceName="demo-ineoclips.webm";
+
+    loadVideo(sourceURL);
+  };
+
+  const start=performance.now();
+
+  rec.start(200);
+
+  function frame(now){
+
+    const t=(now-start)/1000;
+
+    ctx.fillStyle="#101322";
+    ctx.fillRect(0,0,1280,720);
+
+    const g1=ctx.createLinearGradient(0,0,640,720);
+    g1.addColorStop(0,"#172554");
+    g1.addColorStop(1,"#06b6d4");
+
+    ctx.fillStyle=g1;
+    ctx.fillRect(30,30,580,660);
+
+    const g2=ctx.createLinearGradient(640,0,1280,720);
+    g2.addColorStop(0,"#581c87");
+    g2.addColorStop(1,"#db2777");
+
+    ctx.fillStyle=g2;
+    ctx.fillRect(650,30,600,660);
+
+    ctx.fillStyle="#fff";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+
+    ctx.font="130px Arial";
+    ctx.fillText(
+      "⚽",
+      320+Math.sin(t*2)*100,
+      340+Math.cos(t*2)*70
+    );
+
+    ctx.font="bold 55px Arial";
+    ctx.fillText("STREAM",960,570);
+
+    if(t<5){
+      requestAnimationFrame(frame);
+    }else{
+      rec.stop();
+    }
+  }
+
+  requestAnimationFrame(frame);
+
+  toast("Generando demo…");
+});
+
+
+/* ============================================================
+   LAYOUTS
+============================================================ */
+
+function slots(l,W,H){
+
+  if(l==="dividido"){
+    return [
+      [0,0,W,H/2],
+      [0,H/2,W,H/2]
+    ];
+  }
+
+  if(l==="trio"){
+    return [
+      [0,0,W,H/3],
+      [0,H/3,W,H/3],
+      [0,H*2/3,W,H/3]
+    ];
+  }
+
+  if(l==="centrado"){
+    return [
+      [0,(H-W)/2,W,W]
+    ];
+  }
+
+  if(l==="horizontal"){
+
+    const h=W*9/16;
+
+    return [
+      [0,(H-h)/2,W,h]
+    ];
+  }
+
+  return [
+    [0,0,W,H]
+  ];
+}
+
+
+function defaultRects(l){
+
+  const count=slots(l,360,640).length;
+
+  const centers={
+    vertical:[[.5,.5]],
+    dividido:[[.5,.25],[.5,.75]],
+    trio:[[.5,.166],[.5,.5],[.5,.833]],
+    centrado:[[.5,.5]],
+    horizontal:[[.5,.5]]
+  };
+
+  const result=[];
+
+  for(let i=0;i<count;i++){
+
+    const s=slots(l,360,640)[i];
+
+    const slotRatio=s[2]/s[3];
+
+    const sourceRatio=
+      video.videoWidth/video.videoHeight || 16/9;
+
+    let w,h;
+
+    /*
+      El rectángulo representa la zona visible
+      del video fuente.
+    */
+
+    if(slotRatio<sourceRatio){
+      w=slotRatio/sourceRatio;
+      h=1;
+    }else{
+      w=1;
+      h=sourceRatio/slotRatio;
+    }
+
+    w=clamp(w,.05,1);
+    h=clamp(h,.05,1);
+
+    const c=centers[l][i];
+
+    result.push({
+      x:clamp(c[0]-w/2,0,1-w),
+      y:clamp(c[1]-h/2,0,1-h),
+      w,
+      h,
+      scale:1
+    });
+  }
+
+  return result;
+}
+
+
+function setLayout(l){
+
+  layout=l;
+
+  document.querySelectorAll("#layouts button").forEach(btn=>{
+    btn.classList.toggle(
+      "active",
+      btn.dataset.layout===l
+    );
+  });
+
+  const rects=defaultRects(l);
+
+  project.screens=rects.map(r=>({
+    base:{...r},
+    keyframes:[]
+  }));
+
+  selectedScreen=0;
+
+  buildOverlay();
+  updateOverlay();
+  drawPreview();
+  renderTimeline();
+  updateTransformControls();
+}
+
+
+/* ============================================================
+   KEYFRAME ENGINE
+============================================================ */
+
+function cloneTransform(t){
+  return {
+    x:t.x,
+    y:t.y,
+    w:t.w,
+    h:t.h,
+    scale:t.scale
+  };
+}
+
+
+function currentBaseTransform(index){
+
+  if(!project.screens[index]){
+    project.screens[index]={
+      base:defaultRects(layout)[index],
+      keyframes:[]
+    };
+  }
+
+  return project.screens[index].base;
+}
+
+
+function getTransformAt(time,index){
+
+  const screen=project.screens[index];
+
+  if(!screen){
+    return defaultRects(layout)[index];
+  }
+
+  const keys=screen.keyframes
+    .slice()
+    .sort((a,b)=>a.time-b.time);
+
+  if(!keys.length){
+    return cloneTransform(screen.base);
+  }
+
+  let before=null;
+  let after=null;
+
+  for(const key of keys){
+
+    if(key.time<=time){
+      before=key;
+    }
+
+    if(key.time>=time){
+      after=key;
+      break;
+    }
+  }
+
+  if(!before){
+    return cloneTransform(keys[0].transform);
+  }
+
+  if(!after){
+    return cloneTransform(before.transform);
+  }
+
+  if(before.time===after.time){
+    return cloneTransform(before.transform);
+  }
+
+  const f=clamp(
+    (time-before.time)/(after.time-before.time),
+    0,
+    1
+  );
+
+  return {
+    x:lerp(before.transform.x,after.transform.x,f),
+    y:lerp(before.transform.y,after.transform.y,f),
+    w:lerp(before.transform.w,after.transform.w,f),
+    h:lerp(before.transform.h,after.transform.h,f),
+    scale:lerp(before.transform.scale,after.transform.scale,f)
+  };
+}
+
+
+function findKeyframe(index,time){
+
+  const screen=project.screens[index];
+
+  if(!screen) return null;
+
+  const tolerance=.035;
+
+  return screen.keyframes.find(
+    k=>Math.abs(k.time-time)<=tolerance
+  ) || null;
+}
+
+
+function addKeyframe(){
+
+  if(!project) return;
+
+  const transform=getTransformAt(
+    playhead,
+    selectedScreen
+  );
+
+  const screen=project.screens[selectedScreen];
+
+  const existing=findKeyframe(
+    selectedScreen,
+    playhead
+  );
+
+  if(existing){
+
+    existing.transform=cloneTransform(transform);
+
+    toast("Keyframe actualizado.");
+  }else{
+
+    screen.keyframes.push({
+      time:playhead,
+      transform:cloneTransform(transform)
+    });
+
+    screen.keyframes.sort(
+      (a,b)=>a.time-b.time
+    );
+
+    toast("◆ Keyframe agregado.");
+  }
+
+  renderTimeline();
+  updateTransformControls();
+}
+
+
+function deleteKeyframe(){
+
+  const screen=project.screens[selectedScreen];
+
+  if(!screen) return;
+
+  const index=screen.keyframes.findIndex(
+    k=>Math.abs(k.time-playhead)<=.035
+  );
+
+  if(index<0){
+    toast("No hay keyframe en este punto.");
+    return;
+  }
+
+  screen.keyframes.splice(index,1);
+
+  toast("Keyframe eliminado.");
+
+  renderTimeline();
+  updateTransformControls();
+}
+
+
+function updateCurrentKeyframe(){
+
+  const screen=project.screens[selectedScreen];
+
+  if(!screen) return;
+
+  const key=findKeyframe(
+    selectedScreen,
+    playhead
+  );
+
+  if(key){
+
+    const transform=screen.base;
+
+    key.transform=cloneTransform(transform);
+
+    renderTimeline();
+  }
+}
+
+
+/* ============================================================
+   OVERLAY
+============================================================ */
+
+function buildOverlay(){
+
+  overlay.innerHTML="";
+
+  const rects=defaultRects(layout);
+
+  const labels=LABELS[layout];
+
+  rects.forEach((r,index)=>{
+
+    const el=document.createElement("div");
+
+    el.className="crop";
+
+    el.dataset.index=index;
+
+    el.style.setProperty(
+      "border-color",
+      COLORS[index%COLORS.length]
+    );
+
+    el.innerHTML=`
+      <span class="cropLabel">${labels[index]}</span>
+      <span class="cropZoom">1.0x</span>
+
+      <div class="handle nw" data-corner="nw"></div>
+      <div class="handle ne" data-corner="ne"></div>
+      <div class="handle sw" data-corner="sw"></div>
+      <div class="handle se" data-corner="se"></div>
+    `;
+
+    el.addEventListener("click",e=>{
+      e.stopPropagation();
+
+      selectedScreen=index;
+
+      updateOverlay();
+      updateTransformControls();
+    });
+
+    el.addEventListener("dblclick",e=>{
+      e.stopPropagation();
+
+      const base=defaultRects(layout)[index];
+
+      project.screens[index].base={
+        ...base,
+        scale:1
+      };
+
+      if($("#autoKeyframe").checked){
+        addKeyframe();
+      }
+
+      updateOverlay();
+      updateTransformControls();
+      drawPreview();
+
+      toast("Recorte recentrado.");
+    });
+
+    overlay.appendChild(el);
+  });
+}
+
+
+function updateOverlay(){
+
+  const boxes=overlay.querySelectorAll(".crop");
+
+  boxes.forEach((el,index)=>{
+
+    const r=getTransformAt(
+      playhead,
+      index
+    );
+
+    el.style.left=(r.x*100)+"%";
+    el.style.top=(r.y*100)+"%";
+    el.style.width=(r.w*100)+"%";
+    el.style.height=(r.h*100)+"%";
+
+    el.style.zIndex=index===selectedScreen?10:1;
+
+    el.querySelector(".cropZoom").textContent=
+      r.scale.toFixed(2)+"x";
+
+    el.style.borderColor=
+      COLORS[index%COLORS.length];
+  });
+}
+
+
+/* ============================================================
+   DRAG / RESIZE
+============================================================ */
+
+overlay.addEventListener("pointerdown",e=>{
+
+  const box=e.target.closest(".crop");
+
+  if(!box) return;
+
+  e.preventDefault();
+
+  pause();
+
+  const index=Number(box.dataset.index);
+
+  selectedScreen=index;
+
+  const corner=e.target.closest(".handle");
+
+  const rect=source.getBoundingClientRect();
+
+  const original=getTransformAt(
+    playhead,
+    index
+  );
+
+  const startX=e.clientX;
+  const startY=e.clientY;
+
+  dragging=true;
+
+  function move(ev){
+
+    const dx=(ev.clientX-startX)/rect.width;
+    const dy=(ev.clientY-startY)/rect.height;
+
+    let r={...original};
+
+    if(!corner){
+
+      r.x=clamp(
+        original.x+dx,
+        0,
+        1-original.w
+      );
+
+      r.y=clamp(
+        original.y+dy,
+        0,
+        1-original.h
+      );
+
+    }else{
+
+      const c=corner.dataset.corner;
+
+      if(c.includes("e")){
+        r.w=clamp(
+          original.w+dx,
+          .05,
+          1-original.x
+        );
+      }
+
+      if(c.includes("s")){
+        r.h=clamp(
+          original.h+dy,
+          .05,
+          1-original.y
+        );
+      }
+
+      if(c.includes("w")){
+
+        const nx=clamp(
+          original.x+dx,
+          0,
+          original.x+original.w-.05
+        );
+
+        r.w=original.x+original.w-nx;
+        r.x=nx;
+      }
+
+      if(c.includes("n")){
+
+        const ny=clamp(
+          original.y+dy,
+          0,
+          original.y+original.h-.05
+        );
+
+        r.h=original.y+original.h-ny;
+        r.y=ny;
+      }
+    }
+
+    /*
+      Drag/resize cambia la transformación actual.
+    */
+
+    applyTransformEdit(index,r);
+
+    updateOverlay();
+    updateTransformControls();
+    drawPreview();
+  }
+
+  function up(){
+
+    dragging=false;
+
+    if($("#autoKeyframe").checked){
+      renderTimeline();
+    }
+
+    window.removeEventListener("pointermove",move);
+  }
+
+  window.addEventListener(
+    "pointermove",
+    move
+  );
+
+  window.addEventListener(
+    "pointerup",
+    up,
+    {once:true}
+  );
+});
+
+
+/* ============================================================
+   TRANSFORM CONTROLS
+============================================================ */
+
+const xRange=$("#xRange");
+const yRange=$("#yRange");
+const scaleRange=$("#scaleRange");
+
+const xNumber=$("#xNumber");
+const yNumber=$("#yNumber");
+const scaleNumber=$("#scaleNumber");
+
+
+function updateTransformControls(){
+
+  if(!project) return;
+
+  const r=getTransformAt(
+    playhead,
+    selectedScreen
+  );
+
+  const x=r.x*100;
+  const y=r.y*100;
+  const scale=r.scale;
+
+  xRange.value=x;
+  xNumber.value=x.toFixed(1);
+
+  yRange.value=y;
+  yNumber.value=y.toFixed(1);
+
+  scaleRange.value=scale*100;
+  scaleNumber.value=scale.toFixed(2);
+
+  const keyBtn=$("#addKeyframe");
+  const atKey=!!findKeyframe(selectedScreen,playhead);
+  keyBtn.textContent=atKey?"◆ Actualizar keyframe":"◆ Crear keyframe";
+  keyBtn.classList.toggle("primary",!atKey);
+  keyBtn.classList.toggle("ghost",atKey);
+}
+
+
+function applyTransformEdit(index,transform){
+
+  const screen=project.screens[index];
+  if(!screen) return;
+
+  const clean=cloneTransform(transform);
+  const existing=findKeyframe(index,playhead);
+
+  /*
+    Una vez que existe al menos un keyframe, cualquier cambio de
+    transformación se convierte en un punto de animación en el
+    playhead. Esto evita que el primer keyframe "bloquee" el recorte.
+  */
+  if(existing){
+    existing.transform=clean;
+  }else if(screen.keyframes.length>0 || $("#autoKeyframe").checked){
+    screen.keyframes.push({
+      time:playhead,
+      transform:clean
+    });
+    screen.keyframes.sort((a,b)=>a.time-b.time);
+  }else{
+    screen.base=clean;
+  }
+
+  updateOverlay();
+  updateTransformControls();
+  drawPreview();
+}
+
+
+function modifyTransform(property,value){
+
+  if(!project) return;
+
+  value=Number(value);
+
+  const r=getTransformAt(
+    playhead,
+    selectedScreen
+  );
+
+  if(property==="x"){
+    r.x=clamp(value/100,0,1-r.w);
+  }
+
+  if(property==="y"){
+    r.y=clamp(value/100,0,1-r.h);
+  }
+
+  if(property==="scale"){
+    r.scale=clamp(value,.5,5);
+  }
+
+  applyTransformEdit(selectedScreen,r);
+  renderTimeline();
+}
+
+
+xRange.addEventListener("input",()=>{
+  modifyTransform("x",xRange.value);
+});
+
+xNumber.addEventListener("input",()=>{
+  modifyTransform("x",xNumber.value);
+});
+
+yRange.addEventListener("input",()=>{
+  modifyTransform("y",yRange.value);
+});
+
+yNumber.addEventListener("input",()=>{
+  modifyTransform("y",yNumber.value);
+});
+
+scaleRange.addEventListener("input",()=>{
+  modifyTransform(
+    "scale",
+    Number(scaleRange.value)/100
+  );
+});
+
+scaleNumber.addEventListener("input",()=>{
+  modifyTransform(
+    "scale",
+    scaleNumber.value
+  );
+});
+
+
+$("#resetTransform").addEventListener("click",()=>{
+
+  const base=defaultRects(layout)[selectedScreen];
+
+  applyTransformEdit(selectedScreen,{
+    ...base,
+    scale:1
+  });
+  renderTimeline();
+
+  toast("Transformación restablecida.");
+});
+
+
+$("#addKeyframe").addEventListener(
+  "click",
+  addKeyframe
+);
+
+$("#deleteKeyframe").addEventListener(
+  "click",
+  deleteKeyframe
+);
+
+
+/* ============================================================
+   LAYOUT BUTTONS
+============================================================ */
+
+$("#layouts").addEventListener("click",e=>{
+
+  const btn=e.target.closest("button");
+
+  if(!btn) return;
+
+  setLayout(btn.dataset.layout);
+
+  toast("Layout: "+btn.textContent);
+});
+
+
+/* ============================================================
+   INSPECTOR PROFESIONAL
+============================================================ */
+
+const inspectorTabs=document.querySelectorAll(".inspectorTab");
+const inspectorPanels=document.querySelectorAll(".inspectorPanel");
+
+function setInspectorPanel(panel){
+  inspectorTabs.forEach(btn=>{
+    btn.classList.toggle("active",btn.dataset.panel===panel);
+  });
+
+  inspectorPanels.forEach(block=>{
+    block.hidden=block.dataset.panelSection!==panel;
+  });
+}
+
+inspectorTabs.forEach(btn=>{
+  btn.addEventListener("click",()=>setInspectorPanel(btn.dataset.panel));
+});
+
+setInspectorPanel("transform");
+
+
+/* ============================================================
+   COMPOSICIÓN
+============================================================ */
+
+function drawComposite(ctx,W,H){
+
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,W,H);
+
+  if(!video.videoWidth) return;
+
+  const slotList=slots(layout,W,H);
+
+  for(let i=0;i<slotList.length;i++){
+
+    const r=getTransformAt(
+      playhead,
+      i
+    );
+
+    const s=slotList[i];
+
+    /*
+      La escala se aplica alrededor
+      del centro del recorte.
+    */
+
+    const sourceW=
+      video.videoWidth*r.w;
+
+    const sourceH=
+      video.videoHeight*r.h;
+
+    const zoom=Math.max(.01,r.scale||1);
+
+    const scaleX=s[2]/sourceW;
+    const scaleY=s[3]/sourceH;
+
+    const baseScale=Math.max(
+      scaleX,
+      scaleY
+    );
+
+    const finalScale=baseScale*zoom;
+
+    const dw=video.videoWidth*finalScale;
+    const dh=video.videoHeight*finalScale;
+
+    const cx=
+      (r.x+r.w/2)*video.videoWidth;
+
+    const cy=
+      (r.y+r.h/2)*video.videoHeight;
+
+    const dx=
+      s[0]+s[2]/2-cx*finalScale;
+
+    const dy=
+      s[1]+s[3]/2-cy*finalScale;
+
+    ctx.save();
+
+    ctx.beginPath();
+
+    ctx.rect(
+      s[0],
+      s[1],
+      s[2],
+      s[3]
+    );
+
+    ctx.clip();
+
+    ctx.drawImage(
+      video,
+      dx,
+      dy,
+      dw,
+      dh
+    );
+
+    ctx.restore();
+
+    if(i>0){
+
+      ctx.strokeStyle=
+        COLORS[i%COLORS.length];
+
+      ctx.lineWidth=3;
+
+      ctx.beginPath();
+
+      ctx.moveTo(s[0],s[1]);
+      ctx.lineTo(s[0]+s[2],s[1]);
+
+      ctx.stroke();
+    }
+  }
+}
+
+
+/* ============================================================
+   SUBTÍTULOS / MARCA
+============================================================ */
+
+function buildCaptions(){
+
+  if(!project) return;
+
+  const cues=[];
+
+  let t=0;
+  let index=project.seed%PHRASES.length;
+
+  while(t<duration){
+
+    const d=Math.min(
+      1.5+((index*17)%8)*.12,
+      duration-t
+    );
+
+    cues.push({
+      start:t,
+      end:t+d,
+      text:PHRASES[index%PHRASES.length]
+    });
+
+    t+=d;
+    index++;
+  }
+
+  project.captions=cues;
+}
+
+
+
+/* ============================================================
+   TEXTOS PERSONALIZADOS
+============================================================ */
+let selectedTextId=null;
+
+function activeText(){
+  if(!project || !project.texts) return null;
+  return project.texts.find(t=>t.id===selectedTextId) || null;
+}
+
+function renderTextList(){
+  const list=$("#textList");
+  if(!list || !project) return;
+  list.innerHTML="";
+  (project.texts||[]).forEach((t,i)=>{
+    const b=document.createElement("button");
+    b.className="textChip"+(t.id===selectedTextId?" active":"");
+    b.textContent=(i+1)+". "+(t.text||"Texto");
+    b.addEventListener("click",()=>{selectedTextId=t.id; loadTextControls(); renderTextList(); drawPreview();});
+    list.appendChild(b);
+  });
+}
+
+function loadTextControls(){
+  const t=activeText();
+  if(!t) return;
+  $("#textContent").value=t.text;
+  $("#textStart").value=t.start.toFixed(1);
+  $("#textEnd").value=t.end.toFixed(1);
+  $("#textX").value=t.x.toFixed(1);
+  $("#textY").value=t.y.toFixed(1);
+  $("#textSize").value=t.size;
+  $("#textColor").value=t.color;
+  $("#textStyle").value=t.style;
+  $("#textAlign").value=t.align;
+}
+
+function applyTextControls(){
+  const t=activeText();
+  if(!t) return;
+  t.text=$("#textContent").value;
+  t.start=clamp(Number($("#textStart").value)||0,0,duration);
+  t.end=clamp(Number($("#textEnd").value)||0,0,duration);
+  if(t.end<=t.start) t.end=Math.min(duration,t.start+.1);
+  t.x=clamp(Number($("#textX").value)||0,0,100);
+  t.y=clamp(Number($("#textY").value)||0,0,100);
+  t.size=clamp(Number($("#textSize").value)||44,8,240);
+  t.color=$("#textColor").value||"#ffffff";
+  t.style=$("#textStyle").value||"bold";
+  t.align=$("#textAlign").value||"center";
+  renderTextList();
+  drawPreview();
+  toast("Texto actualizado.");
+}
+
+$("#addTextBtn").addEventListener("click",()=>{
+  if(!project) return;
+  const t={
+    id:"txt_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
+    text:"Nuevo texto",
+    start:clamp(playhead,0,duration),
+    end:clamp(playhead+2,0,duration),
+    x:50,y:85,size:44,color:"#ffffff",style:"bold",align:"center"
+  };
+  if(t.end<=t.start) t.end=Math.min(duration,t.start+.1);
+  project.texts.push(t);
+  selectedTextId=t.id;
+  renderTextList();
+  loadTextControls();
+  drawPreview();
+});
+
+$("#deleteTextBtn").addEventListener("click",()=>{
+  if(!project || !selectedTextId) return;
+  project.texts=project.texts.filter(t=>t.id!==selectedTextId);
+  selectedTextId=project.texts.at(-1)?.id||null;
+  renderTextList();
+  loadTextControls();
+  drawPreview();
+  toast("Texto eliminado.");
+});
+
+$("#textApplyBtn").addEventListener("click",applyTextControls);
+
+function drawCustomTexts(ctx,W,H){
+  if(!project || !project.texts) return;
+  for(const t of project.texts){
+    if(!t.text || playhead<t.start || playhead>=t.end) continue;
+    const fs=Math.max(8,Math.round(t.size*(H/640)));
+    ctx.save();
+    ctx.font=`${t.style||"bold"} ${fs}px Inter, Arial, sans-serif`;
+    ctx.textAlign=t.align||"center";
+    ctx.textBaseline="middle";
+    ctx.lineWidth=Math.max(2,fs*.12);
+    ctx.strokeStyle="rgba(0,0,0,.9)";
+    ctx.fillStyle=t.color||"#fff";
+    const x=W*clamp(t.x,0,100)/100;
+    const y=H*clamp(t.y,0,100)/100;
+    ctx.strokeText(t.text,x,y);
+    ctx.fillText(t.text,x,y);
+    ctx.restore();
+  }
+}
+
+function drawExtras(ctx,W,H){
+
+  if($("#brandToggle").checked){
+
+    ctx.font=
+      "700 "+Math.round(H*.018)+"px Inter";
+
+    ctx.textAlign="left";
+    ctx.textBaseline="middle";
+
+    const text="@ineoclips";
+
+    const width=
+      ctx.measureText(text).width+18;
+
+    ctx.fillStyle="rgba(0,0,0,.6)";
+
+    ctx.fillRect(
+      W-width-10,
+      10,
+      width,
+      26
+    );
+
+    ctx.fillStyle="#d8ff3e";
+
+    ctx.fillText(
+      text,
+      W-width-1,
+      23
+    );
+  }
+
+
+  if($("#captionsToggle").checked){
+
+    const cue=project.captions.find(
+      c=>playhead>=c.start &&
+         playhead<c.end
+    );
+
+    if(cue){
+      const fs=Math.round(H*.035);
+
+    ctx.font=
+      "700 "+fs+"px Inter";
+
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+
+    ctx.lineWidth=fs*.2;
+    ctx.strokeStyle="rgba(0,0,0,.9)";
+    ctx.fillStyle="#fff";
+
+    ctx.strokeText(
+      cue.text,
+      W/2,
+      H*.89
+    );
+
+      ctx.fillText(
+        cue.text,
+        W/2,
+        H*.89
+      );
+    }
+  }
+
+  drawCustomTexts(ctx,W,H);
+}
+
+
+function drawPreview(){
+
+  try{
+
+    drawComposite(
+      pctx,
+      preview.width,
+      preview.height
+    );
+
+    drawExtras(
+      pctx,
+      preview.width,
+      preview.height
+    );
+
+  }catch(e){}
+}
+
+
+$("#captionsToggle").addEventListener(
+  "change",
+  drawPreview
+);
+
+$("#brandToggle").addEventListener(
+  "change",
+  drawPreview
+);
+
+
+/* ============================================================
+   TIMELINE
+============================================================ */
+
+function totalDuration(){
+
+  if(!project) return 0;
+
+  return project.segments.reduce(
+    (sum,s)=>sum+(s.end-s.start),
+    0
+  );
+}
+
+
+function sequence(){
+
+  let current=0;
+
+  return project.segments.map(
+    (s,index)=>{
+
+      const d=s.end-s.start;
+
+      const item={
+        index,
+        start:s.start,
+        end:s.end,
+        duration:d,
+        seqStart:current,
+        seqEnd:current+d
+      };
+
+      current+=d;
+
+      return item;
+    }
+  );
+}
+
+
+function segmentAt(t){
+
+  const list=sequence();
+
+  return list.find(
+    s=>t>=s.seqStart && t<s.seqEnd
+  ) || list[list.length-1];
+}
+
+
+function renderTimeline(){
+
+  if(!project) return;
+
+  const total=totalDuration();
+
+  const width=
+    track.clientWidth || 800;
+
+  pps=total>0?width/total:60;
+
+  ruler.innerHTML="";
+
+  const step=
+    total<=20?2:
+    total<=60?5:
+    total<=180?15:
+    30;
+
+  for(let t=0;t<=total;t+=step){
+
+    const tick=document.createElement("div");
+
+    tick.className="tick";
+
+    tick.style.left=
+      (t*pps)+"px";
+
+    tick.textContent=fmt(t);
+
+    ruler.appendChild(tick);
+  }
+
+
+  segmentsEl.innerHTML="";
+
+  sequence().forEach(item=>{
+
+    const el=document.createElement("div");
+
+    el.className=
+      "segment"+
+      (item.index===selectedSegment?" selected":"");
+
+    el.dataset.index=item.index;
+
+    el.style.left=
+      item.seqStart*pps+"px";
+
+    el.style.width=
+      Math.max(12,item.duration*pps)+"px";
+
+    el.style.setProperty(
+      "--seg",
+      ["#8b5cf6","#ec4899","#22d3ee","#34d399"][
+        item.index%4
+      ]
+    );
+
+    el.innerHTML=`
+      <span class="segText">
+        #${item.index+1} · ${item.duration.toFixed(1)}s
+      </span>
+      <div class="trim left"></div>
+      <div class="trim right"></div>
+    `;
+
+    segmentsEl.appendChild(el);
+  });
+
+
+  /* TEXT MARKERS */
+  (project.texts||[]).forEach((t)=>{
+    const a=document.createElement("div");
+    a.className="keyMarker";
+    a.style.left=(t.start*pps)+"px";
+    a.style.top="31px";
+    a.style.borderBottomColor=t.color||"#fff";
+    a.title="Texto: "+(t.text||"")+" · "+fmt(t.start)+"–"+fmt(t.end);
+    a.addEventListener("click",e=>{
+      e.stopPropagation();
+      selectedTextId=t.id;
+      loadTextControls();
+      renderTextList();
+      seek(t.start);
+    });
+    track.appendChild(a);
+  });
+
+  /*
+    KEYFRAME MARKERS
+  */
+
+  project.screens.forEach(
+    (screen,screenIndex)=>{
+
+      screen.keyframes.forEach(key=>{
+
+        const marker=document.createElement("div");
+
+        marker.className="keyMarker";
+
+        marker.style.left=
+          key.time*pps+"px";
+
+        marker.style.borderBottomColor=
+          COLORS[screenIndex%COLORS.length];
+
+        marker.title=
+          "Keyframe · Pantalla "+(screenIndex+1)+
+          " · "+fmt(key.time);
+
+        marker.addEventListener(
+          "click",
+          e=>{
+            e.stopPropagation();
+
+            selectedScreen=screenIndex;
+
+            seek(key.time);
+
+            updateTransformControls();
+
+            updateOverlay();
+          }
+        );
+
+        track.appendChild(marker);
+      });
+    }
+  );
+
+
+  updateTime();
+}
+
+
+function updateTime(){
+
+  const total=totalDuration();
+
+  timeEl.textContent=
+    fmt(playhead)+" / "+fmt(total);
+
+  playheadEl.style.left=
+    playhead*pps+"px";
+}
+
+
+function seek(t){
+
+  if(!project) return;
+
+  playhead=clamp(
+    t,
+    0,
+    totalDuration()
+  );
+
+  const seg=segmentAt(playhead);
+
+  if(seg){
+
+    const local=
+      playhead-seg.seqStart;
+
+    safeSeek(
+      seg.start+local
+    );
+  }
+
+  updateOverlay();
+  updateTransformControls();
+  drawPreview();
+  updateTime();
+}
+
+
+track.addEventListener("pointerdown",e=>{
+
+  if(!project) return;
+
+  const rect=track.getBoundingClientRect();
+
+  function calculate(clientX){
+
+    const t=
+      clamp(
+        (clientX-rect.left)/pps,
+        0,
+        totalDuration()
+      );
+
+    seek(t);
+  }
+
+  calculate(e.clientX);
+
+  pause();
+
+  function move(ev){
+    calculate(ev.clientX);
+  }
+
+  function up(){
+    window.removeEventListener(
+      "pointermove",
+      move
+    );
+  }
+
+  window.addEventListener(
+    "pointermove",
+    move
+  );
+
+  window.addEventListener(
+    "pointerup",
+    up,
+    {once:true}
+  );
+});
+
+
+segmentsEl.addEventListener("pointerdown",e=>{
+
+  const seg=e.target.closest(".segment");
+
+  if(!seg) return;
+
+  selectedSegment=
+    Number(seg.dataset.index);
+
+  renderTimeline();
+});
+
+
+/* ============================================================
+   TRIM
+============================================================ */
+
+track.addEventListener("pointerdown",e=>{
+
+  const handle=e.target.closest(".trim");
+
+  if(!handle) return;
+
+  const seg=e.target.closest(".segment");
+
+  if(!seg) return;
+
+  e.stopPropagation();
+
+  const index=Number(seg.dataset.index);
+
+  selectedSegment=index;
+
+  pause();
+
+  const original={
+    ...project.segments[index]
+  };
+
+  const x0=e.clientX;
+
+  function move(ev){
+
+    const delta=
+      (ev.clientX-x0)/pps;
+
+    if(handle.classList.contains("left")){
+
+      project.segments[index].start=
+        clamp(
+          original.start+delta,
+          0,
+          original.end-.1
+        );
+
+    }else{
+
+      project.segments[index].end=
+        clamp(
+          original.end+delta,
+          original.start+.1,
+          duration
+        );
+    }
+
+    renderTimeline();
+  }
+
+  window.addEventListener(
+    "pointermove",
+    move
+  );
+
+  window.addEventListener(
+    "pointerup",
+    ()=>{
+      window.removeEventListener(
+        "pointermove",
+        move
+      );
+
+      seek(playhead);
+    },
+    {once:true}
+  );
+});
+
+
+/* ============================================================
+   PLAYBACK
+============================================================ */
+
+function play(){
+
+  if(!project) return;
+
+  if(playhead>=totalDuration()-.01){
+    seek(0);
+  }
+
+  playing=true;
+
+  playBtn.textContent="⏸";
+
+  updateVideoVolume();
+
+  video.play().catch(()=>{});
+
+  lastFrame=performance.now();
+
+  requestAnimationFrame(loop);
+}
+
+
+function pause(){
+
+  playing=false;
+
+  playBtn.textContent="▶";
+
+  try{
+    video.pause();
+  }catch(e){}
+}
+
+
+function loop(now){
+
+  if(!playing) return;
+
+  const delta=
+    Math.min(.1,(now-lastFrame)/1000);
+
+  lastFrame=now;
+
+  playhead+=delta;
+
+  const total=totalDuration();
+
+  if(playhead>=total){
+
+    playhead=total;
+
+    pause();
+
+    if(exporting && recorder && recorder.state!=="inactive"){
+      try{ recorder.stop(); }catch(e){}
+    }
+
+    updateTime();
+    return;
+  }
+
+
+  const seg=segmentAt(playhead);
+
+  if(seg){
+
+    const target=
+      seg.start+
+      (playhead-seg.seqStart);
+
+    if(
+      Math.abs(video.currentTime-target)>.12
+    ){
+      safeSeek(target);
+    }
+  }
+
+
+  updateOverlay();
+  updateTransformControls();
+  drawPreview();
+  updateTime();
+
+  if(exporting){
+
+    try{
+      drawExportFrame();
+    }catch(e){}
+
+    const percent=
+      total>0?(playhead/total)*100:0;
+
+    progressBar.style.width=
+      percent+"%";
+
+    progressText.textContent=
+      Math.round(percent)+"%";
+  }
+
+
+  requestAnimationFrame(loop);
+}
+
+
+playBtn.addEventListener("click",()=>{
+  playing?pause():play();
+});
+
+
+$("#prevBtn").addEventListener("click",()=>{
+
+  const list=sequence();
+
+  const current=segmentAt(playhead);
+
+  if(!current) return;
+
+  const index=
+    Math.max(0,current.index-1);
+
+  seek(list[index].seqStart+.001);
+});
+
+
+$("#nextBtn").addEventListener("click",()=>{
+
+  const list=sequence();
+
+  const current=segmentAt(playhead);
+
+  if(!current) return;
+
+  const index=
+    Math.min(
+      list.length-1,
+      current.index+1
+    );
+
+  seek(list[index].seqStart+.001);
+});
+
+
+/* ============================================================
+   SPLIT / DELETE / MOVE
+============================================================ */
+
+function saveUndo(){
+
+  if(!project) return;
+
+  undoStack.push(
+    JSON.stringify(project.segments)
+  );
+
+  if(undoStack.length>40){
+    undoStack.shift();
+  }
+}
+
+
+function split(){
+
+  const seg=segmentAt(playhead);
+
+  if(!seg){
+    toast("Nada que cortar.");
+    return;
+  }
+
+  const local=
+    playhead-seg.seqStart;
+
+  if(local<.15 || local>seg.duration-.15){
+    toast("Demasiado cerca del borde.");
+    return;
+  }
+
+  saveUndo();
+
+  const mid=
+    seg.start+local;
+
+  project.segments.splice(
+    seg.index,
+    1,
+    {
+      start:seg.start,
+      end:mid
+    },
+    {
+      start:mid,
+      end:seg.end
+    }
+  );
+
+  selectedSegment=seg.index+1;
+
+  renderTimeline();
+
+  toast("Video dividido.");
+}
+
+
+function deleteSegment(){
+
+  if(project.segments.length<=1){
+    toast("No podés eliminar el último segmento.");
+    return;
+  }
+
+  saveUndo();
+
+  project.segments.splice(
+    selectedSegment,
+    1
+  );
+
+  selectedSegment=
+    clamp(
+      selectedSegment,
+      0,
+      project.segments.length-1
+    );
+
+  seek(
+    Math.min(
+      playhead,
+      totalDuration()
+    )
+  );
+
+  renderTimeline();
+
+  toast("Segmento eliminado.");
+}
+
+
+function moveSegment(dir){
+
+  const target=
+    selectedSegment+dir;
+
+  if(
+    target<0 ||
+    target>=project.segments.length
+  ) return;
+
+  saveUndo();
+
+  const a=project.segments;
+
+  [
+    a[selectedSegment],
+    a[target]
+  ]=[
+    a[target],
+    a[selectedSegment]
+  ];
+
+  selectedSegment=target;
+
+  renderTimeline();
+
+  toast("Segmento reordenado.");
+}
+
+
+function undo(){
+
+  if(!undoStack.length){
+    toast("Nada que deshacer.");
+    return;
+  }
+
+  project.segments=
+    JSON.parse(
+      undoStack.pop()
+    );
+
+  renderTimeline();
+
+  toast("Deshecho.");
+}
+
+
+$("#splitBtn").addEventListener(
+  "click",
+  split
+);
+
+$("#deleteBtn").addEventListener(
+  "click",
+  deleteSegment
+);
+
+$("#moveLeft").addEventListener(
+  "click",
+  ()=>moveSegment(-1)
+);
+
+$("#moveRight").addEventListener(
+  "click",
+  ()=>moveSegment(1)
+);
+
+$("#undoBtn").addEventListener(
+  "click",
+  undo
+);
+
+$("#newBtn").addEventListener(
+  "click",
+  ()=>{
+    location.reload();
+  }
+);
+
+
+/* ============================================================
+   AUDIO
+============================================================ */
+
+const volumeTransport=$("#volumeTransport");
+const volumeSide=$("#volumeSide");
+const volumeValue=$("#volumeValue");
+const muteToggle=$("#muteToggle");
+const volumeIcon=$("#volumeIcon");
+const sideVolumeIcon=$("#sideVolumeIcon");
+
+
+function updateVideoVolume(){
+
+  video.volume=muted?0:clamp(volume,0,1);
+  video.muted=muted;
+}
+
+
+function updateVolume(){
+
+  volumeTransport.value=
+    Math.round(volume*100);
+
+  volumeSide.value=
+    Math.round(volume*100);
+
+  volumeValue.textContent=
+    Math.round(volume*100)+"%";
+
+  const icon=
+    muted || volume===0
+      ?"🔇"
+      :volume<.5
+        ?"🔉"
+        :"🔊";
+
+  volumeIcon.textContent=icon;
+  sideVolumeIcon.textContent=icon;
+
+  updateVideoVolume();
+}
+
+
+function setVolume(value){
+
+  volume=
+    clamp(Number(value)/100,0,2);
+
+  if(volume>0 && muted){
+    muted=false;
+    muteToggle.checked=false;
+  }
+
+  updateVolume();
+}
+
+
+volumeTransport.addEventListener(
+  "input",
+  e=>setVolume(e.target.value)
+);
+
+volumeSide.addEventListener(
+  "input",
+  e=>setVolume(e.target.value)
+);
+
+muteToggle.addEventListener(
+  "change",
+  ()=>{
+    muted=muteToggle.checked;
+    updateVolume();
+  }
+);
+
+
+/* ============================================================
+   EXPORTACIÓN
+============================================================ */
+
+
+function drawExportFrame(){
+  const ctx=exportCanvas.getContext("2d");
+  drawComposite(ctx,exportCanvas.width,exportCanvas.height);
+  drawExtras(ctx,exportCanvas.width,exportCanvas.height);
+}
+
+async function blobToUint8(blob){
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function loadFFmpeg(){
+  if(ffmpegLoaded && ffmpegInstance) return ffmpegInstance;
+  const statusEl=$("#ffmpegStatus");
+  statusEl.textContent="Cargando FFmpeg WebAssembly…";
+  if(!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg){
+    throw new Error("No se pudo cargar la librería FFmpeg WebAssembly.");
+  }
+  const ffmpeg=new window.FFmpegWASM.FFmpeg();
+  ffmpeg.on("log",({message})=>{
+    if(message && /error|invalid|failed/i.test(message)) console.warn("[FFmpeg]",message);
+  });
+  ffmpeg.on("progress",({progress})=>{
+    if(exporting){
+      const p=Math.max(0,Math.min(1,progress||0));
+      progressBar.style.width=Math.round(p*100)+"%";
+      progressText.textContent=Math.round(p*100)+"% · FFmpeg";
+    }
+  });
+  const toBlobURL=async(url,mime)=>{
+    const r=await fetch(url);
+    if(!r.ok) throw new Error("No se pudo descargar "+url);
+    const b=await r.blob();
+    return URL.createObjectURL(new Blob([b],{type:mime}));
+  };
+  const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+  const coreURL=await toBlobURL(base+"/ffmpeg-core.js","text/javascript");
+  const wasmURL=await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm");
+  await ffmpeg.load({coreURL,wasmURL});
+  ffmpegInstance=ffmpeg;
+  ffmpegLoaded=true;
+  statusEl.textContent="FFmpeg listo. Exportación MP4 habilitada.";
+  return ffmpeg;
+}
+
+function getInputExtension(){
+  const m=(sourceName||"").match(/\.([a-z0-9]+)$/i);
+  return m?m[1].toLowerCase():"webm";
+}
+
+function makeAudioFilter(){
+  const segs=project.segments||[];
+  if(!segs.length) return null;
+  const vol=muted?0:clamp(volume,0,2);
+  const parts=segs.map((s,i)=>
+    `[0:a]atrim=start=${s.start.toFixed(4)}:end=${s.end.toFixed(4)},asetpts=PTS-STARTPTS,volume=${vol.toFixed(3)}[a${i}]`
+  );
+  if(segs.length===1) return {filter:parts[0]+";[a0]anull[aout]",map:"[aout]"};
+  return {
+    filter:parts.join(";")+";"+segs.map((_,i)=>`[a${i}]`).join("")+
+      `concat=n=${segs.length}:v=0:a=1[aout]`,
+    map:"[aout]"
+  };
+}
+
+async function recordRenderedVideo(fps){
+  return await new Promise((resolve,reject)=>{
+    exportChunks=[];
+    const stream=exportCanvas.captureStream(fps);
+    let mime="";
+    for(const m of [
+      "video/webm;codecs=vp9",
+      "video/webm;codecs=vp8",
+      "video/webm"
+    ]){
+      if(MediaRecorder.isTypeSupported(m)){mime=m;break;}
+    }
+    let rec;
+    try{
+      rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:Number($("#qualitySelect").value||6000000)}:undefined);
+    }catch(e){reject(e);return;}
+    recorder=rec;
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)exportChunks.push(e.data);};
+    rec.onerror=e=>reject(e.error||e);
+    rec.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      if(!exportChunks.length){reject(new Error("No se generó video renderizado."));return;}
+      resolve({blob:new Blob(exportChunks,{type:mime||"video/webm"}),mime});
+    };
+    cancelExport=false;
+    exporting=true;
+    exportOverlay.hidden=false;
+    progressBar.style.width="0%";
+    progressText.textContent="0% · Renderizando preview";
+    seek(0);
+    pause();
+    drawExportFrame();
+    rec.start(250);
+    playing=true;
+    playBtn.textContent="⏸";
+    lastFrame=performance.now();
+    requestAnimationFrame(loop);
+  });
+}
+
+async function startExport(){
+  if(exporting) return;
+  if(!project || totalDuration()<=0){
+    toast("No hay contenido para exportar.");
+    return;
+  }
+  if(!sourceBlob){
+    toast("No hay archivo fuente para exportar.");
+    return;
+  }
+
+  try{
+    const fps=Number($("#fpsSelect").value||30);
+    const bitrate=Number($("#qualitySelect").value||6000000);
+    const ffmpeg=await loadFFmpeg();
+    if(cancelExport) return;
+
+    const rendered=await recordRenderedVideo(fps);
+    if(cancelExport) return;
+
+    exporting=true;
+    progressText.textContent="0% · Preparando MP4…";
+
+    const inputExt=getInputExtension();
+    const inputName=`source.${inputExt}`;
+    await ffmpeg.writeFile(inputName,await blobToUint8(sourceBlob));
+    await ffmpeg.writeFile("render.webm",await blobToUint8(rendered.blob));
+
+    const audio=makeAudioFilter();
+    const output="ineoclips-output.mp4";
+
+    const args=[
+      "-i","render.webm",
+      "-i",inputName
+    ];
+
+    if(audio){
+      args.push("-filter_complex",audio.filter,"-map","0:v:0","-map",audio.map);
+    }else{
+      args.push("-map","0:v:0");
+    }
+
+    args.push(
+      "-r",String(fps),
+      "-s","720x1280",
+      "-c:v","libx264",
+      "-preset","ultrafast",
+      "-b:v",String(bitrate),
+      "-pix_fmt","yuv420p"
+    );
+
+    if(audio){
+      args.push("-c:a","aac","-b:a","192k","-shortest");
+    }else{
+      args.push("-an");
+    }
+
+    args.push("-movflags","+faststart",output);
+
+    await ffmpeg.exec(args);
+
+    if(cancelExport) return;
+
+    const data=await ffmpeg.readFile(output);
+    const blob=new Blob([data.buffer],{type:"video/mp4"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`ineoclips-${layout}-720x1280-${fps}fps.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+
+    try{await ffmpeg.deleteFile(output);}catch(e){}
+    try{await ffmpeg.deleteFile("render.webm");}catch(e){}
+    try{await ffmpeg.deleteFile(inputName);}catch(e){}
+
+    toast("MP4 exportado correctamente.");
+    progressBar.style.width="100%";
+    progressText.textContent="100% · Listo";
+  }catch(err){
+    console.error(err);
+    toast("Error al exportar MP4: "+(err.message||"revisá la consola"));
+    const statusEl=$("#ffmpegStatus");
+    statusEl.textContent="FFmpeg no pudo finalizar la exportación. Probá servir el HTML por localhost/HTTPS.";
+  }finally{
+    exporting=false;
+    exportOverlay.hidden=true;
+    playing=false;
+    try{video.pause();}catch(e){}
+    playBtn.textContent="▶";
+    if(recorder && recorder.state!=="inactive"){
+      try{recorder.stop();}catch(e){}
+    }
+  }
+}
+
+function finishExport(){
+  if(!exporting) return;
+  cancelExport=true;
+  exporting=false;
+  playing=false;
+  try{video.pause();}catch(e){}
+  playBtn.textContent="▶";
+  if(recorder && recorder.state!=="inactive"){
+    try{recorder.stop();}catch(e){}
+  }
+}
+
+$("#exportBtn").addEventListener("click",startExport);
+$("#cancelExport").addEventListener("click",()=>{
+  cancelExport=true;
+  finishExport();
+});
+
+/* ============================================================
+   KEYBOARD
+============================================================ */
+
+window.addEventListener("keydown",e=>{
+
+  if(editorScreen.hidden) return;
+
+  if(
+    e.target.matches(
+      "input,textarea,select"
+    )
+  ) return;
+
+  if(e.code==="Space"){
+
+    e.preventDefault();
+
+    playing?pause():play();
+  }
+
+  else if(e.key==="s" || e.key==="S"){
+    split();
+  }
+
+  else if(
+    e.key==="Delete" ||
+    e.key==="Backspace"
+  ){
+    deleteSegment();
+  }
+
+  else if(
+    (e.ctrlKey||e.metaKey) &&
+    e.key.toLowerCase()==="z"
+  ){
+
+    e.preventDefault();
+
+    undo();
+  }
+
+  else if(e.key==="ArrowLeft"){
+
+    e.preventDefault();
+
+    seek(
+      playhead-
+      (e.shiftKey?1:.2)
+    );
+  }
+
+  else if(e.key==="ArrowRight"){
+
+    e.preventDefault();
+
+    seek(
+      playhead+
+      (e.shiftKey?1:.2)
+    );
+  }
+
+  else if(e.key==="k" || e.key==="K"){
+
+    e.preventDefault();
+
+    addKeyframe();
+  }
+});
+
+
+/* ============================================================
+   RESIZE
+============================================================ */
+
+function fitSource(){
+
+  if(!video.videoWidth || !video.videoHeight){
+    return;
+  }
+
+  const available=
+    Math.max(
+      300,
+      document.querySelector(".left").clientWidth-2
+    );
+
+  const maxHeight=
+    Math.max(
+      300,
+      window.innerHeight*.57
+    );
+
+  let width=available;
+
+  let height=
+    width*
+    video.videoHeight/
+    video.videoWidth;
+
+  if(height>maxHeight){
+
+    height=maxHeight;
+
+    width=
+      height*
+      video.videoWidth/
+      video.videoHeight;
+  }
+
+  source.style.width=
+    Math.round(width)+"px";
+
+  source.style.height=
+    Math.round(height)+"px";
+}
+
+
+window.addEventListener(
+  "resize",
+  ()=>{
+    if(editorScreen.hidden) return;
+
+    fitSource();
+    renderTimeline();
+    updateOverlay();
+    drawPreview();
+  }
+);
+
+
+/* ============================================================
+   REBUILD
+============================================================ */
+
+function rebuild(){
+
+  if(!project) return;
+
+  renderTimeline();
+  updateOverlay();
+  updateTransformControls();
+  updateTime();
+  drawPreview();
+}
+
+
+/* ============================================================
+   INICIALIZACIÓN
+============================================================ */
+
+$("#captionsToggle").checked=true;
+
+updateVolume();
+
+})();
+</script>
+
+
+<script>
+/* ineoclips — GitHub Pages safety/autosave layer */
+(() => {
+  const DB_NAME = "ineoclips-studio";
+  const DB_VERSION = 1;
+  const STORE = "projects";
+  let dbPromise;
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve,reject)=>{
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(STORE)){
+          db.createObjectStore(STORE, {keyPath:"id"});
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  async function saveProjectSafe(state){
+    try{
+      if(!state) return;
+      const db = await openDB();
+      await new Promise((resolve,reject)=>{
+        const tx = db.transaction(STORE,"readwrite");
+        tx.objectStore(STORE).put({
+          id:"current",
+          savedAt:Date.now(),
+          state
+        });
+        tx.oncomplete=resolve;
+        tx.onerror=()=>reject(tx.error);
+      });
+    }catch(e){
+      console.warn("Autosave:",e);
+    }
+  }
+
+  async function loadProjectSafe(){
+    try{
+      const db = await openDB();
+      return await new Promise((resolve,reject)=>{
+        const tx=db.transaction(STORE,"readonly");
+        const req=tx.objectStore(STORE).get("current");
+        req.onsuccess=()=>resolve(req.result||null);
+        req.onerror=()=>reject(req.error);
+      });
+    }catch(e){ return null; }
+  }
+
+  window.ineoclipsRecovery = {
+    save: saveProjectSafe,
+    load: loadProjectSafe,
+    clear: async () => {
+      try{
+        const db=await openDB();
+        await new Promise((resolve,reject)=>{
+          const tx=db.transaction(STORE,"readwrite");
+          tx.objectStore(STORE).delete("current");
+          tx.oncomplete=resolve;
+          tx.onerror=()=>reject(tx.error);
+        });
+      }catch(e){}
+    }
+  };
+
+  // Save only JSON-safe editor state when the host editor exposes `project`.
+  setInterval(() => {
+    try{
+      if(window.project && typeof window.project === "object"){
+        const clone = JSON.parse(JSON.stringify(window.project));
+        saveProjectSafe(clone);
+      }
+    }catch(e){}
+  }, 3000);
+})();
+</script>
+
+</body>
+</html>
