@@ -854,40 +854,34 @@ main{
 
 <script>
 /* FFmpeg loader for GitHub Pages.
-   IMPORTANT: load the UMD bundle as a real <script> so webpack resolves
-   its 814.ffmpeg.js worker relative to the CDN URL, not to an extension/blob. */
+   FFmpeg 0.12.x ships its UI/runtime as UMD, but its lazy worker chunk
+   (814.ffmpeg.js) must be supplied as a Blob URL to avoid cross-origin
+   Worker restrictions on GitHub Pages. */
 window.__loadIneoFFmpegWASM = (async () => {
   if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) return window.FFmpegWASM;
 
-  const scriptURL =
-    "https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js";
+  const src = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js";
+  const response = await fetch(src, { mode: "cors", cache: "force-cache" });
+  if (!response.ok) throw new Error("No se pudo descargar FFmpeg: " + response.status);
+  let code = await response.text();
 
-  await new Promise((resolve, reject) => {
-    if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = scriptURL;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => {
-      if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
-        resolve();
-      } else {
-        reject(new Error("FFmpeg se cargó, pero no expuso FFmpegWASM."));
-      }
-    };
-    script.onerror = () =>
-      reject(new Error("No se pudo cargar la librería FFmpeg desde CDN."));
-    document.head.appendChild(script);
-  });
-
-  if (!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg) {
-    throw new Error("FFmpeg WebAssembly no expuso FFmpegWASM.");
+  // Do not let webpack create the 814 worker from its CDN URL.
+  // ffmpeg.load() supplies workerLoadURL as a same-origin Blob URL.
+  const workerExpr = /new Worker\(new URL\(e\.p\+e\.u\(814\),e\.b\)(?:,\{type:void 0\})?\)/;
+  if (workerExpr.test(code)) {
+    code = code.replace(workerExpr, 'new Worker(r.workerLoadURL)');
+  } else if (code.includes('new URL(e.p+e.u(814),e.b)')) {
+    code = code.replace('new URL(e.p+e.u(814),e.b)', 'r.workerLoadURL');
+  } else {
+    throw new Error("No se pudo redirigir el Worker 814 de FFmpeg.");
   }
 
+  const blobURL = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+  try {
+    await import(blobURL);
+  } finally {
+    URL.revokeObjectURL(blobURL);
+  }
   return window.FFmpegWASM;
 })();
 </script>
@@ -1199,7 +1193,7 @@ window.__loadIneoFFmpegWASM = (async () => {
           </div>
         </div>
         <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · 720×1280</button>
-        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker se adapta automáticamente para evitar CORS.</div>
+        <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker 814 se carga como Blob para evitar el bloqueo de Workers entre orígenes.</div>
       </div>
 
     </aside>
@@ -3624,9 +3618,13 @@ async function loadFFmpeg(){
     return URL.createObjectURL(new Blob([b],{type:mime}));
   };
   const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-  const coreURL=await toBlobURL(base+"/ffmpeg-core.js","text/javascript");
-  const wasmURL=await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm");
-  await ffmpeg.load({coreURL,wasmURL});
+  const ffmpegBase="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd";
+  const [coreURL,wasmURL,workerLoadURL]=await Promise.all([
+    toBlobURL(base+"/ffmpeg-core.js","text/javascript"),
+    toBlobURL(base+"/ffmpeg-core.wasm","application/wasm"),
+    toBlobURL(ffmpegBase+"/814.ffmpeg.js","text/javascript")
+  ]);
+  await ffmpeg.load({coreURL,wasmURL,workerLoadURL});
   ffmpegInstance=ffmpeg;
   ffmpegLoaded=true;
   statusEl.textContent="FFmpeg listo. Exportación MP4 habilitada.";
