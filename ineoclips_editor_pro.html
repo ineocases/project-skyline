@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ineoclips — editor</title>
+<style>
+:root{--bg:#0b0b12;--panel:#13131d;--panel2:#1a1a27;--line:#29293c;--txt:#f4f4f8;--mut:#9999ae;--vio:#8b5cf6;--cyan:#22d3ee;--lime:#d8ff3e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px Arial,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}
+.top{height:58px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;background:#0b0b12ee;backdrop-filter:blur(10px);z-index:20}.logo{font-size:21px;font-weight:800}.logo i{color:var(--lime);font-style:normal}.badge{font-size:11px;color:var(--lime);border:1px solid #d8ff3e55;padding:6px 11px;border-radius:20px}
+main{max-width:1450px;margin:auto;padding:22px}.screen{animation:in .2s ease}@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.hero{text-align:center;max-width:800px;margin:45px auto 28px}.hero h1{font-size:42px;margin:0}.hero h1 span{background:linear-gradient(90deg,var(--cyan),var(--vio),var(--lime));color:transparent;background-clip:text}.hero p{color:var(--mut);line-height:1.6}
+.drop{max-width:680px;margin:auto;border:2px dashed #38384f;border-radius:20px;background:var(--panel);padding:40px;text-align:center;display:block;cursor:pointer}.drop:hover{border-color:var(--vio)}.drop b{display:block;font-size:18px;margin-bottom:7px}.drop strong{font-size:50px;display:block;margin-bottom:12px}.hint{color:var(--mut);font-size:12px}.importBtns{text-align:center;margin:14px}.btn{border:0;border-radius:10px;padding:10px 15px;color:var(--txt);background:var(--panel2);border:1px solid var(--line);font-weight:700}.btn:hover{border-color:var(--vio)}.primary{background:linear-gradient(90deg,var(--vio),#d946ef);border:0}.status{text-align:center;color:var(--mut);font-size:12px;min-height:16px}
+.editor{display:grid;grid-template-columns:minmax(500px,1fr) 330px;gap:16px}.left{min-width:0}.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.bar h2{font-size:18px;margin-right:auto}.layouts{display:flex;gap:4px;background:var(--panel);padding:4px;border:1px solid var(--line);border-radius:10px}.layouts button{background:none;color:var(--mut);border:0;padding:8px 10px;border-radius:7px}.layouts button.on{background:var(--cyan);color:#062a33}
+.source{background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative;margin:auto}.source video{display:block;width:100%;height:100%}.overlay{position:absolute;inset:0}.box{position:absolute;border:2px solid var(--cyan);cursor:move}.box .lab{position:absolute;top:4px;left:4px;background:var(--cyan);color:#04262d;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:800}.handle{position:absolute;width:13px;height:13px;background:var(--cyan);border:2px solid #000;border-radius:3px}.nw{left:-7px;top:-7px}.ne{right:-7px;top:-7px}.sw{left:-7px;bottom:-7px}.se{right:-7px;bottom:-7px}
+.transport,.timeline,.panelbox{background:var(--panel);border:1px solid var(--line);border-radius:14px}.transport{display:flex;align-items:center;gap:7px;padding:10px;margin-top:12px}.play{background:var(--cyan);color:#062a33}.time{color:var(--mut);font-variant-numeric:tabular-nums}.spacer{flex:1}
+.timeline{padding:12px;margin-top:12px}.ruler{height:18px;position:relative;color:var(--mut);font-size:10px}.tick{position:absolute}.track{height:64px;background:#0d0d16;border-radius:10px;position:relative;overflow:hidden;cursor:crosshair}.seg{position:absolute;top:5px;bottom:5px;border-radius:8px;background:#7048c9;border:1px solid #ffffff22}.seg.sel{outline:2px solid var(--lime)}.seg span{font-size:10px;padding:5px;color:#fff;display:block}.head{position:absolute;top:0;bottom:0;width:2px;background:var(--lime);z-index:5;pointer-events:none}
+.panel{display:flex;flex-direction:column;gap:12px}.panelbox{padding:14px}.panelbox h3{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;margin:0 0 11px}.preview{background:#000;border-radius:10px;padding:10px;text-align:center}.preview canvas{width:230px;max-width:100%;border-radius:8px;display:block;margin:auto}
+.row{display:flex;align-items:center;gap:8px;margin:9px 0}.row label{flex:1;color:#ddd;font-size:12px}.row input[type=number],.row input[type=text],.row select{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px}.row input[type=range]{width:100%}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.key{background:#202034;border:1px solid #44445d;color:var(--lime);padding:8px;border-radius:8px;font-weight:700}.danger:hover{color:#ff7070;border-color:#ff7070}.textlist{max-height:170px;overflow:auto}.textitem{padding:8px;border:1px solid var(--line);border-radius:8px;margin:5px 0;background:var(--panel2);cursor:pointer;font-size:12px}.textitem.sel{border-color:var(--cyan)}
+.modal{position:fixed;inset:0;background:#000b;z-index:50;display:flex;align-items:center;justify-content:center}.modal>div{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;width:min(450px,92vw)}.modal h2{margin-top:0}.progress{height:8px;background:var(--panel2);border-radius:20px;overflow:hidden}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--lime))}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 15px;border-radius:10px;z-index:100}
+@media(max-width:1000px){.editor{grid-template-columns:1fr}.panel{width:100%}.hero h1{font-size:30px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="logo">ineoclips<i>.</i></div><div class="badge">● editor local</div></header>
+<main>
+<section id="import" class="screen">
+<div class="hero"><h1>Editor de video <span>multipantalla</span></h1><p>Dividí pantallas, animá posición y escala con keyframes, agregá subtítulos/textos, controlá volumen y exportá a MP4 con FPS y calidad configurables.</p></div>
+<label class="drop" id="drop"><strong>🎬</strong><b>Soltá tu video acá</b><span class="hint">MP4 · MOV · WEBM · procesamiento local</span></label>
+<div class="importBtns"><label class="btn primary">📁 Elegir video <input id="file" type="file" accept="video/*" hidden></label><button id="demo" class="btn">✨ Demo</button></div>
+<div id="status" class="status">Listo para cargar.</div>
+</section>
+
+<section id="editor" class="screen" hidden>
+<div class="bar">
+<h2>ineoclips · editor</h2>
+<div class="layouts" id="layouts">
+<button data-l="vertical">Vertical</button><button data-l="dividido" class="on">Dividido</button><button data-l="trio">Trío</button><button data-l="centrado">Spotlight</button><button data-l="horizontal">Horizontal</button>
+</div>
+<button id="new" class="btn">＋ Nuevo</button>
+</div>
+
+<div class="editor">
+<div class="left">
+<div id="source" class="source"><video id="video" playsinline preload="auto"></video><div id="boxes" class="overlay"></div></div>
+<div class="transport"><button id="prev" class="btn">⏮</button><button id="play" class="btn play">▶</button><button id="next" class="btn">⏭</button><span id="time" class="time">00:00 / 00:00</span><span class="spacer"></span><button id="split" class="btn">✂ Cortar</button><button id="del" class="btn danger">🗑</button></div>
+<div class="timeline"><div id="ruler" class="ruler"></div><div id="track" class="track"><div id="segments"></div><div id="head" class="head"></div></div></div>
+</div>
+
+<aside class="panel">
+<div class="panelbox"><h3>Vista previa 9:16</h3><div class="preview"><canvas id="preview" width="360" height="640"></canvas></div></div>
+
+<div class="panelbox"><h3>Audio</h3>
+<div class="row"><label>Volumen</label><input id="volume" type="range" min="0" max="1" step=".01" value="1"></div>
+<div class="row"><button id="mute" class="btn" style="width:100%">🔊 Silenciar</button></div>
+</div>
+
+<div class="panelbox"><h3>Keyframes</h3>
+<div class="row"><label>Posición X</label><input id="kx" type="number" min="0" max="100" step=".1"></div>
+<div class="row"><label>Posición Y</label><input id="ky" type="number" min="0" max="100" step=".1"></div>
+<div class="row"><label>Escala %</label><input id="ks" type="number" min="5" max="500" step=".1"></div>
+<button id="key" class="key" style="width:100%">◆ Agregar keyframe</button>
+<p style="color:var(--mut);font-size:11px;line-height:1.5">Los valores se interpolan automáticamente entre keyframes. Mové/redimensioná el recorte y agregá otro keyframe en otro momento.</p>
+</div>
+
+<div class="panelbox"><h3>Textos</h3>
+<div class="row"><input id="text" type="text" placeholder="Escribí un texto..."></div>
+<div class="two"><div class="row"><input id="ts" type="number" min="0" step=".1" placeholder="Inicio"></div><div class="row"><input id="te" type="number" min=".1" step=".1" placeholder="Fin"></div></div>
+<div class="two"><button id="addText" class="btn">＋ Agregar</button><button id="delText" class="btn danger">Eliminar</button></div>
+<div id="textList" class="textlist"></div>
+</div>
+
+<div class="panelbox"><h3>Exportación MP4</h3>
+<div class="two"><div class="row"><label>FPS</label><select id="fps"><option>24</option><option selected>30</option><option>60</option></select></div><div class="row"><label>Calidad</label><select id="quality"><option value="2500000">Baja</option><option value="5000000" selected>Alta</option><option value="8000000">Muy alta</option><option value="12000000">Máxima</option></select></div></div>
+<button id="export" class="btn primary" style="width:100%">⬇ Exportar MP4</button>
+<p style="font-size:10px;color:var(--mut);line-height:1.5">La exportación MP4 usa FFmpeg WebAssembly y se ejecuta en el navegador. La primera exportación puede tardar mientras descarga el motor.</p>
+</div>
+</aside>
+</div>
+</section>
+</main>
+
+<div id="modal" class="modal" hidden><div><h2>Renderizando MP4… 🎬</h2><div class="progress"><i id="prog"></i></div><p id="progText" style="color:var(--mut);font-size:12px">Preparando FFmpeg…</p><button id="cancel" class="btn">Cancelar</button></div></div>
+<div id="toast" class="toast" hidden></div>
+<script>
+(async function(){
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const imp=$("#import"),ed=$("#editor"),file=$("#file"),drop=$("#drop"),status=$("#status"),video=$("#video"),source=$("#source"),boxes=$("#boxes"),canvas=$("#preview"),ctx=canvas.getContext("2d");
+let url="",duration=0,layout="dividido",segments=[],selected=0,seqTime=0,playing=false,last=0,rects=[],keyframes=[],texts=[],selectedText=-1,volume=1,muted=false,drag=null,ffmpeg=null,cancelled=false;
+
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),fmt=t=>{t=Math.max(0,t||0);return String(Math.floor(t/60)).padStart(2,"0")+":"+String(Math.floor(t%60)).padStart(2,"0")};
+function toast(m){let x=$("#toast");x.textContent=m;x.hidden=false;clearTimeout(x._t);x._t=setTimeout(()=>x.hidden=true,2500)}
+function isVideo(f){return f&&(f.type.startsWith("video/")||/\.(mp4|mov|webm|mkv|m4v|avi|ogv)$/i.test(f.name))}
+function load(f){if(!isVideo(f))return toast("El archivo no es un video válido");if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(f);video.src=url;video.load();status.textContent="Cargando "+f.name+"…"}
+file.addEventListener("change",()=>file.files[0]&&load(file.files[0]));
+drop.addEventListener("dragover",e=>{e.preventDefault();drop.style.borderColor="var(--vio)"});
+drop.addEventListener("dragleave",()=>drop.style.borderColor="");
+drop.addEventListener("drop",e=>{e.preventDefault();drop.style.borderColor="";let f=e.dataTransfer.files[0];if(f)load(f)});
+video.addEventListener("loadedmetadata",()=>{
+duration=video.duration;if(!isFinite(duration)||duration<=0)return toast("No se pudo leer la duración");
+segments=[{start:0,end:duration}];selected=0;seqTime=0;layout="dividido";makeRects();imp.hidden=true;ed.hidden=false;fit();render();seek(0);toast("Video cargado correctamente");
+});
+window.addEventListener("resize",()=>{if(!ed.hidden){fit();render()}});
+function slots(){let W=360,H=640;if(layout==="trio")return [[0,0,W,H/3],[0,H/3,W,H/3],[0,2*H/3,W,H/3]];if(layout==="vertical")return [[0,0,W,H]];if(layout==="centrado")return [[0,(H-W)/2,W,W]];if(layout==="horizontal"){let h=W*9/16;return [[0,(H-h)/2,W,h]]}return [[0,0,W,H/2],[0,H/2,W,H/2]]}
+function makeRects(){let s=slots();rects=s.map((_,i)=>{let centers=layout==="dividido"?[[.35,.5],[.65,.5]]:layout==="trio"?[[.22,.5],[.5,.5],[.78,.5]]:[[.5,.5]];let na=(s[i][2]/s[i][3])*(video.videoHeight/video.videoWidth||1);let w=na<=1?na:1,h=na<=1?1:1/na;return{x:clamp(centers[i][0]-w/2,0,1-w),y:clamp(centers[i][1]-h/2,0,1-h),w,h,scale:1}})}
+function fit(){let w=Math.min(source.parentElement.clientWidth,900),h=w*(video.videoHeight/video.videoWidth);let max=window.innerHeight*.56;if(h>max){h=max;w=h*video.videoWidth/video.videoHeight}source.style.width=Math.round(w)+"px";source.style.height=Math.round(h)+"px"}
+function layoutRectsAt(t){if(!keyframes.length)return rects;let ks=keyframes.filter(k=>k.index===selected).sort((a,b)=>a.t-b.t);if(!ks.length)return rects;let a=ks.filter(k=>k.t<=t).pop(),b=ks.find(k=>k.t>=t);if(!a)return [ks[0].r,...rects.slice(1)];if(!b||a===b)return [a.r,...rects.slice(1)];let f=(t-a.t)/(b.t-a.t),r=a.r,q=b.r;return [{x:r.x+(q.x-r.x)*f,y:r.y+(q.y-r.y)*f,w:r.w+(q.w-r.w)*f,h:r.h+(q.h-r.h)*f,scale:r.scale+(q.scale-r.scale)*f},...rects.slice(1)]}
+function draw(){ctx.fillStyle="#000";ctx.fillRect(0,0,360,640);let sl=slots();let rr=layoutRectsAt(seqTime);for(let i=0;i<sl.length;i++){let r=rr[i]||rects[i],s=sl[i];if(!r||!s)continue;let vw=video.videoWidth,vh=video.videoHeight,sw=vw*r.w/r.scale,sh=vh*r.h/r.scale,sc=Math.max(s[2]/sw,s[3]/sh),dw=vw*sc,dh=vh*sc,cx=(r.x+r.w/2)*vw,cy=(r.y+r.h/2)*vh;ctx.save();ctx.beginPath();ctx.rect(...s);ctx.clip();ctx.drawImage(video,s[0]+s[2]/2-cx*sc,s[1]+s[3]/2-cy*sc,dw,dh);ctx.restore()}texts.forEach(t=>{if(seqTime>=t.s&&seqTime<t.e){ctx.textAlign="center";ctx.textBaseline="middle";let fs=38;ctx.font="800 "+fs+"px Arial";ctx.lineWidth=8;ctx.strokeStyle="rgba(0,0,0,.85)";ctx.strokeText(t.text,t.x*360,t.y*640);ctx.fillStyle=t.color||"#fff";ctx.fillText(t.text,t.x*360,t.y*640)}})}
+function renderBoxes(){boxes.innerHTML="";let labs=layout==="trio"?["Top","Mid","Bottom"]:layout==="dividido"?["Top","Bottom"]:["Recorte"];rects.forEach((r,i)=>{let d=document.createElement("div");d.className="box";d.dataset.i=i;d.style.left=r.x*100+"%";d.style.top=r.y*100+"%";d.style.width=r.w*100+"%";d.style.height=r.h*100+"%";d.innerHTML='<span class="lab">'+(labs[i]||"Recorte")+'</span><i class="handle nw"></i><i class="handle ne"></i><i class="handle sw"></i><i class="handle se"></i>';boxes.appendChild(d)})}
+function render(){renderBoxes();let total=segments.reduce((a,s)=>a+s.end-s.start,0),w=$("#track").clientWidth||800;let p=w/Math.max(total,.01);$("#segments").innerHTML="";segments.forEach((s,i)=>{let d=document.createElement("div");d.className="seg"+(i===selected?" sel":"");d.style.left=s.seq*p+"px";d.style.width=Math.max(8,(s.end-s.start)*p)+"px";d.innerHTML="<span>#"+(i+1)+" · "+(s.end-s.start).toFixed(1)+"s</span>";d.onclick=e=>{e.stopPropagation();selected=i;render()};$("#segments").appendChild(d)});$("#head").style.left=seqTime*p+"px";$("#time").textContent=fmt(seqTime)+" / "+fmt(total);renderTexts();draw()}
+function timelineInfo(t){let a=0;for(let i=0;i<segments.length;i++){let d=segments[i].end-segments[i].start;if(t<=a+d)return{...segments[i],seq:a,index:i};a+=d}return null}
+function seek(t){let total=segments.reduce((a,s)=>a+s.end-s.start,0);seqTime=clamp(t,0,total);let x=timelineInfo(seqTime);if(x)video.currentTime=x.start+(seqTime-x.seq);rects=layoutRectsAt(seqTime);render()}
+$("#track").onclick=e=>{let r=$("#track").getBoundingClientRect(),total=segments.reduce((a,s)=>a+s.end-s.start,0);seek(clamp((e.clientX-r.left)/r.width*total,0,total))};
+$("#play").onclick=()=>playing?pause():play();
+function play(){if(seqTime>=segments.reduce((a,s)=>a+s.end-s.start,0)-.02)seqTime=0;playing=true;$("#play").textContent="⏸";video.volume=muted?0:volume;video.play().catch(()=>{});last=performance.now();requestAnimationFrame(loop)}
+function pause(){playing=false;video.pause();$("#play").textContent="▶"}
+function loop(t){if(!playing)return;let dt=Math.min(.08,(t-last)/1000);last=t;seqTime+=dt;let total=segments.reduce((a,s)=>a+s.end-s.start,0);if(seqTime>=total){seqTime=total;pause()}let x=timelineInfo(seqTime);if(x){let target=x.start+seqTime-x.seq;if(Math.abs(video.currentTime-target)>.12)video.currentTime=target}rects=layoutRectsAt(seqTime);render();requestAnimationFrame(loop)}
+$("#prev").onclick=()=>{let x=timelineInfo(seqTime);seek(Math.max(0,(x?x.seq:0)-.001))};
+$("#next").onclick=()=>{let x=timelineInfo(seqTime);seek(x?x.seq+(x.end-x.start):0)};
+$("#split").onclick=()=>{let x=timelineInfo(seqTime);if(!x)return;let local=seqTime-x.seq;if(local<.15||local>x.end-x.start-.15)return toast("Muy cerca del borde");let m=x.start+local;segments.splice(x.index,1,{start:x.start,end:m},{start:m,end:x.end});selected=x.index+1;render();toast("Segmento dividido")};
+$("#del").onclick=()=>{if(segments.length<=1)return toast("No podés eliminar el único segmento");segments.splice(selected,1);selected=clamp(selected,0,segments.length-1);render()};
+$("#layouts").onclick=e=>{let b=e.target.closest("button");if(!b)return;layout=b.dataset.l;$$("#layouts button").forEach(x=>x.classList.toggle("on",x===b));makeRects();keyframes=[];render()};
+boxes.addEventListener("pointerdown",e=>{let b=e.target.closest(".box");if(!b)return;let i=+b.dataset.i,c=e.target.closest(".handle"),r=boxes.getBoundingClientRect(),o={...rects[i]},x=e.clientX,y=e.clientY;drag={i};e.preventDefault();function mv(ev){let dx=(ev.clientX-x)/r.width,dy=(ev.clientY-y)/r.height,n={...o};if(!c){n.x=clamp(o.x+dx,0,1-o.w);n.y=clamp(o.y+dy,0,1-o.h)}else{n.w=clamp(o.w+(c.classList.contains("e")?dx:-dx),.05,1);n.h=clamp(o.h+(c.classList.contains("s")?dy:-dy),.05,1);if(c.classList.contains("w"))n.x=clamp(o.x+dx,0,1-n.w);if(c.classList.contains("n"))n.y=clamp(o.y+dy,0,1-n.h)}rects[i]=n;$("#kx").value=(n.x*100).toFixed(1);$("#ky").value=(n.y*100).toFixed(1);$("#ks").value=(n.scale*100).toFixed(1);renderBoxes();draw()}function up(){window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);drag=null}window.addEventListener("pointermove",mv);window.addEventListener("pointerup",up)});
+$("#kx").oninput=()=>{rects[selected].x=clamp(+$("#kx").value/100,0,1-rects[selected].w);renderBoxes();draw()};
+$("#ky").oninput=()=>{rects[selected].y=clamp(+$("#ky").value/100,0,1-rects[selected].h);renderBoxes();draw()};
+$("#ks").oninput=()=>{rects[selected].scale=clamp(+$("#ks").value/100,.05,5);draw()};
+$("#key").onclick=()=>{let r={...rects[selected]};keyframes.push({t:seqTime,index:selected,r});keyframes.sort((a,b)=>a.t-b.t);toast("Keyframe agregado en "+fmt(seqTime))};
+$("#volume").oninput=()=>{volume=+$("#volume").value;video.volume=muted?0:volume};
+$("#mute").onclick=()=>{muted=!muted;video.volume=muted?0:volume;$("#mute").textContent=muted?"🔇 Activar sonido":"🔊 Silenciar"};
+$("#addText").onclick=()=>{let v=$("#text").value.trim();if(!v)return toast("Escribí un texto");let s=+$("#ts").value||seqTime,e=+$("#te").value||Math.min(seqTime+3,duration);if(e<=s)return toast("El fin debe ser mayor que el inicio");texts.push({text:v,s,e,x:.5,y:.82,color:"#fff"});selectedText=texts.length-1;renderTexts();draw()};
+$("#delText").onclick=()=>{if(selectedText<0)return;texts.splice(selectedText,1);selectedText=-1;renderTexts();draw()};
+function renderTexts(){$("#textList").innerHTML="";texts.forEach((t,i)=>{let d=document.createElement("div");d.className="textitem"+(i===selectedText?" sel":"");d.textContent=t.text+" · "+fmt(t.s)+"–"+fmt(t.e);d.onclick=()=>{selectedText=i;$("#text").value=t.text;$("#ts").value=t.s;$("#te").value=t.e;renderTexts()};$("#textList").appendChild(d)})}
+$("#text").oninput=()=>{if(selectedText>=0){texts[selectedText].text=$("#text").value;draw();renderTexts()}};
+$("#ts").oninput=()=>{if(selectedText>=0){texts[selectedText].s=+$("#ts").value;draw();renderTexts()}};
+$("#te").oninput=()=>{if(selectedText>=0){texts[selectedText].e=+$("#te").value;draw();renderTexts()}};
+$("#new").onclick=()=>location.reload();
+$("#demo").onclick=()=>toast("Cargá un video para editarlo");
+document.addEventListener("keydown",e=>{if(ed.hidden)return;if(e.code==="Space"){e.preventDefault();playing?pause():play()}if(e.key.toLowerCase()==="s")$("#split").click();if(e.key==="Delete")$("#del").click()});
+
+let ffmpegLoading=null;
+async function getFFmpeg(){
+if(ffmpeg)return ffmpeg;
+if(ffmpegLoading)return ffmpegLoading;
+ffmpegLoading=(async()=>{
+const mod=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm");
+const util=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm");
+const {FFmpeg}=mod,{fetchFile,toBlobURL}=util;let f=new FFmpeg();
+f.on("progress",p=>{$("#prog").style.width=Math.round(p.progress*100)+"%";$("#progText").textContent="Codificando "+Math.round(p.progress*100)+"%";});
+const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
+await f.load({coreURL:await toBlobURL(base+"/ffmpeg-core.js","text/javascript"),wasmURL:await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm")});
+ffmpeg=f;window.__fetchFile=fetchFile;return f})();
+return ffmpegLoading;
+}
+$("#cancel").onclick=()=>{cancelled=true;$("#modal").hidden=true};
+$("#export").onclick=async()=>{
+if(!url)return;
+cancelled=false;$("#modal").hidden=false;$("#prog").style.width="0%";$("#progText").textContent="Preparando FFmpeg…";
+try{
+let f=await getFFmpeg();if(cancelled)return;
+let input="input."+((url.match(/\.([a-z0-9]+)$/i)||[])[1]||"mp4");
+await f.writeFile(input,await window.__fetchFile(url));
+if(cancelled)return;
+let fps=$("#fps").value,bit=$("#quality").value;
+let vf="scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1";
+await f.exec(["-i",input,"-vf",vf,"-r",fps,"-c:v","libx264","-preset","veryfast","-b:v",bit,"-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-movflags","+faststart","output.mp4"]);
+if(cancelled)return;
+let data=await f.readFile("output.mp4"),blob=new Blob([data.buffer],{type:"video/mp4"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="ineoclips-"+Date.now()+".mp4";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("MP4 exportado correctamente");
+}catch(err){console.error(err);toast("Error exportando MP4: "+(err.message||err))}finally{$("#modal").hidden=true}
+};
+})();
+</script>
+</body>
+</html>
