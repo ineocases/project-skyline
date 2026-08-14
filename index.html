@@ -3683,45 +3683,89 @@ function makeAudioFilter(){
   };
 }
 
-async function recordRenderedVideo(fps){
-  return await new Promise((resolve,reject)=>{
-    exportChunks=[];
-    const stream=exportCanvas.captureStream(fps);
-    let mime="";
-    for(const m of [
-      "video/webm;codecs=vp9",
-      "video/webm;codecs=vp8",
-      "video/webm"
-    ]){
-      if(MediaRecorder.isTypeSupported(m)){mime=m;break;}
+
+async function recordRenderedVideo(duration, fps, canvas, video, drawFrame, onProgress){
+  if(!("VideoEncoder" in window) || !("VideoFrame" in window)){
+    throw new Error("Este navegador no soporta WebCodecs. Usá Chrome/Edge actualizado.");
+  }
+
+  const width = canvas.width;
+  const height = canvas.height;
+  const totalFrames = Math.max(1, Math.ceil(duration * fps));
+  const frameDurationUs = Math.round(1000000 / fps);
+  const chunks = [];
+  let encoderError = null;
+
+  // H.264 baseline-compatible configuration for MP4 muxing later.
+  const config = {
+    codec: "avc1.4D002A",
+    width,
+    height,
+    bitrate: Math.round(width * height * fps * 0.08),
+    framerate: fps,
+    latencyMode: "quality"
+  };
+
+  const support = await VideoEncoder.isConfigSupported(config);
+  if(!support.supported){
+    throw new Error("El navegador no admite H.264 mediante WebCodecs con esta configuración.");
+  }
+
+  const encoder = new VideoEncoder({
+    output(chunk, meta){
+      chunks.push({chunk, meta});
+    },
+    error(err){
+      encoderError = err;
     }
-    let rec;
-    try{
-      rec=new MediaRecorder(stream,mime?{mimeType:mime,videoBitsPerSecond:Number($("#qualitySelect").value||6000000)}:undefined);
-    }catch(e){reject(e);return;}
-    recorder=rec;
-    rec.ondataavailable=e=>{if(e.data&&e.data.size)exportChunks.push(e.data);};
-    rec.onerror=e=>reject(e.error||e);
-    rec.onstop=()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      if(!exportChunks.length){reject(new Error("No se generó video renderizado."));return;}
-      resolve({blob:new Blob(exportChunks,{type:mime||"video/webm"}),mime});
-    };
-    cancelExport=false;
-    exporting=true;
-    exportOverlay.hidden=false;
-    progressBar.style.width="0%";
-    progressText.textContent="0% · Renderizando vertical 720×1280";
-    seek(0);
-    pause();
-    drawExportFrame();
-    rec.start(250);
-    playing=true;
-    playBtn.textContent="⏸";
-    lastFrame=performance.now();
-    requestAnimationFrame(loop);
   });
+
+  encoder.configure(config);
+
+  try{
+    // Render each frame deterministically. No MediaRecorder and no
+    // requestAnimationFrame timing are involved in the export.
+    for(let n=0; n<totalFrames; n++){
+      if(encoderError) throw encoderError;
+
+      const t = Math.min(duration, n / fps);
+      video.currentTime = t;
+      await new Promise(resolve=>{
+        const done=()=>{ video.removeEventListener("seeked",done); resolve(); };
+        video.addEventListener("seeked",done,{once:true});
+        // Safari/Chrome may not emit seeked for identical timestamps.
+        setTimeout(done, 250);
+      });
+
+      drawFrame(t);
+
+      const vf = new VideoFrame(canvas, {
+        timestamp: n * frameDurationUs,
+        duration: frameDurationUs
+      });
+
+      encoder.encode(vf, {keyFrame: n === 0 || n % Math.max(1, fps*2) === 0});
+      vf.close();
+
+      // Backpressure: don't let the encoder queue grow without bound.
+      if(encoder.encodeQueueSize > 4){
+        await encoder.flush();
+      }
+
+      if(onProgress) onProgress((n+1)/totalFrames);
+    }
+
+    await encoder.flush();
+    if(encoderError) throw encoderError;
+
+    // WebCodecs emits elementary H.264 chunks. The existing FFmpeg stage
+    // muxes these into MP4 together with the original audio track.
+    return {chunks, width, height, fps};
+  }finally{
+    try{encoder.close();}catch(e){}
+  }
 }
+
 
 async function startExport(){
   if(exporting) return;
