@@ -853,62 +853,41 @@ main{
 </style>
 
 <script>
-/* FFmpeg loader for GitHub Pages:
-   @ffmpeg/ffmpeg UMD normally creates a cross-origin Worker (814.ffmpeg.js).
-   We fetch the wrapper, patch that Worker construction, and import it from
-   a same-origin Blob URL. The FFmpeg core/wasm remain fetched as Blob URLs. */
+/* FFmpeg loader for GitHub Pages.
+   IMPORTANT: load the UMD bundle as a real <script> so webpack resolves
+   its 814.ffmpeg.js worker relative to the CDN URL, not to an extension/blob. */
 window.__loadIneoFFmpegWASM = (async () => {
   if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) return window.FFmpegWASM;
 
-  const src = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js";
-  const response = await fetch(src, { mode: "cors", cache: "force-cache" });
-  if (!response.ok) throw new Error("No se pudo descargar FFmpeg: " + response.status);
+  const scriptURL =
+    "https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js";
 
-  let code = await response.text();
-
-  // Patch the exact webpack-generated worker construction used by 0.12.10.
-  const patterns = [
-    /new Worker\(new URL\(e\.p\+e\.u\(814\),e\.b\),\{type:void 0\}\)/,
-    /new Worker\(new URL\(e\.p\+e\.u\(814\),e\.b\)\)/
-  ];
-
-  let patched = false;
-  for (const pattern of patterns) {
-    if (pattern.test(code)) {
-      code = code.replace(pattern,
-        'new Worker(URL.createObjectURL(new Blob([\'importScripts("\'+new URL(e.p+e.u(814),e.b).toString()+\'");\'],{type:"text/javascript"})))'
-      );
-      patched = true;
-      break;
+  await new Promise((resolve, reject) => {
+    if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
+      resolve();
+      return;
     }
-  }
 
-  if (!patched) {
-    // Fallback for formatting changes: replace the worker constructor around chunk 814.
-    const needle = "new URL(e.p+e.u(814),e.b)";
-    if (code.includes(needle)) {
-      code = code.replace(
-        /new Worker\([^;]*new URL\(e\.p\+e\.u\(814\),e\.b\)[^;]*\)/,
-        'new Worker(URL.createObjectURL(new Blob([\'importScripts("\'+new URL(e.p+e.u(814),e.b).toString()+\'");\'],{type:"text/javascript"})))'
-      );
-      patched = true;
-    }
-  }
-
-  if (!patched) {
-    throw new Error("No se pudo aplicar el parche de Worker de FFmpeg 0.12.10.");
-  }
-
-  const blobURL = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
-  try {
-    await import(blobURL);
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(blobURL), 30000);
-  }
+    const script = document.createElement("script");
+    script.src = scriptURL;
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.onload = () => {
+      if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
+        resolve();
+      } else {
+        reject(new Error("FFmpeg se cargó, pero no expuso FFmpegWASM."));
+      }
+    };
+    script.onerror = () =>
+      reject(new Error("No se pudo cargar la librería FFmpeg desde CDN."));
+    document.head.appendChild(script);
+  });
 
   if (!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg) {
     throw new Error("FFmpeg WebAssembly no expuso FFmpegWASM.");
   }
+
   return window.FFmpegWASM;
 })();
 </script>
