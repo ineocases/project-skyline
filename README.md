@@ -14,3 +14,6 @@ El editor conserva el estado del proyecto y no debe destruir la edición si la e
 
 
 Exportación: MP4 vertical 720×1280 (9:16), con suavizado de imagen y codificación H.264. No requiere `.nojekyll`.
+
+
+Exportación: WebCodecs frame-accurate H.264, 720x1280, con empaquetado MP4 mediante FFmpeg.wasm. Requiere Chrome/Edge actualizado.
