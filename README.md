@@ -11,3 +11,6 @@ La exportación MP4 usa FFmpeg WebAssembly. El cargador adapta el Worker de `@ff
 **Abrir desde GitHub Pages (`https://...github.io/...`)**, no desde `file://`.
 
 El editor conserva el estado del proyecto y no debe destruir la edición si la exportación falla.
+
+
+Exportación: MP4 vertical 720×1280 (9:16), con suavizado de imagen y codificación H.264. No requiere `.nojekyll`.

@@ -1220,7 +1220,7 @@ window.__loadIneoFFmpegWASM = (async () => {
             </select>
           </div>
         </div>
-        <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · 720×1280</button>
+        <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · Vertical 720×1280</button>
         <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker se adapta automáticamente para evitar CORS.</div>
       </div>
 
@@ -1295,6 +1295,9 @@ const preview = $("#preview");
 const pctx = preview.getContext("2d");
 
 const exportCanvas = $("#exportCanvas");
+const EXPORT_W=720, EXPORT_H=1280;
+exportCanvas.width=EXPORT_W;
+exportCanvas.height=EXPORT_H;
 
 const ruler = $("#ruler");
 const track = $("#track");
@@ -3611,9 +3614,11 @@ muteToggle.addEventListener(
 
 
 function drawExportFrame(){
-  const ctx=exportCanvas.getContext("2d");
-  drawComposite(ctx,exportCanvas.width,exportCanvas.height);
-  drawExtras(ctx,exportCanvas.width,exportCanvas.height);
+  const ctx=exportCanvas.getContext("2d",{alpha:false});
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  drawComposite(ctx,EXPORT_W,EXPORT_H);
+  drawExtras(ctx,EXPORT_W,EXPORT_H);
 }
 
 async function blobToUint8(blob){
@@ -3706,7 +3711,7 @@ async function recordRenderedVideo(fps){
     exporting=true;
     exportOverlay.hidden=false;
     progressBar.style.width="0%";
-    progressText.textContent="0% · Renderizando preview";
+    progressText.textContent="0% · Renderizando vertical 720×1280";
     seek(0);
     pause();
     drawExportFrame();
@@ -3762,10 +3767,10 @@ async function startExport(){
 
     args.push(
       "-r",String(fps),
-      "-s","720x1280",
+      "-vf","scale=720:1280:flags=lanczos,setsar=1",
       "-c:v","libx264",
       "-preset","ultrafast",
-      "-b:v",String(bitrate),
+      "-crf", bitrate>=14000000?"18":bitrate>=9000000?"20":bitrate>=6000000?"21":"23",
       "-pix_fmt","yuv420p"
     );
 
@@ -3777,9 +3782,10 @@ async function startExport(){
 
     args.push("-movflags","+faststart",output);
 
-    let execCode = await ffmpeg.exec(args);
+    const execCode = await ffmpeg.exec(args);
 
     if(cancelExport) return;
+    if(typeof execCode === "number" && execCode !== 0) throw new Error("FFmpeg terminó con código "+execCode+".");
 
     // Some source videos have no audio track. In that case the audio
     // filter cannot produce the MP4, so retry the exact same render
@@ -3791,14 +3797,14 @@ async function startExport(){
       if (audio) {
         console.warn("[Export] MP4 con audio no se pudo leer; reintentando sin audio.", readErr);
         try { await ffmpeg.deleteFile(output); } catch(e) {}
-        const videoOnlyArgs=["-i","render.webm","-map","0:v:0","-r",String(fps),"-s","720x1280","-c:v","libx264","-preset","ultrafast","-b:v",String(bitrate),"-pix_fmt","yuv420p","-an","-movflags","+faststart",output];
+        const videoOnlyArgs=["-i","render.webm","-map","0:v:0","-r",String(fps),"-vf","scale=720:1280:flags=lanczos,setsar=1","-c:v","libx264","-preset","ultrafast","-crf", bitrate>=14000000?"18":bitrate>=9000000?"20":bitrate>=6000000?"21":"23","-pix_fmt","yuv420p","-an","-movflags","+faststart",output];
         await ffmpeg.exec(videoOnlyArgs);
         data = await ffmpeg.readFile(output);
       } else {
         throw readErr;
       }
     }
-    const blob=new Blob([data.buffer],{type:"video/mp4"});
+    const blob=new Blob([data],{type:"video/mp4"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url;
