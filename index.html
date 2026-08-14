@@ -853,41 +853,63 @@ main{
 </style>
 
 <script>
-/* FFmpeg loader for GitHub Pages.
-   IMPORTANT: load the UMD bundle as a real <script> so webpack resolves
-   its 814.ffmpeg.js worker relative to the CDN URL, not to an extension/blob. */
+/* FFmpeg 0.12.10 loader for GitHub Pages.
+   The UMD build creates 814.ffmpeg.js as a separate Worker. Chrome blocks
+   that Worker when its URL is on a different origin. We therefore fetch
+   BOTH ffmpeg.js and 814.ffmpeg.js, turn them into Blob URLs, and explicitly
+   give the Blob URL to FFmpeg as workerLoadURL. */
 window.__loadIneoFFmpegWASM = (async () => {
   if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) return window.FFmpegWASM;
 
-  const scriptURL =
-    "https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd/ffmpeg.js";
+  const base = "https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd";
+  const toBlobURL = async (url, mime) => {
+    const r = await fetch(url, { mode: "cors", cache: "force-cache" });
+    if (!r.ok) throw new Error(`No se pudo descargar FFmpeg (${r.status}): ${url}`);
+    const b = await r.blob();
+    return URL.createObjectURL(new Blob([b], { type: mime }));
+  };
 
-  await new Promise((resolve, reject) => {
-    if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
-      resolve();
-      return;
+  const [ffmpegURL, workerURL] = await Promise.all([
+    toBlobURL(`${base}/ffmpeg.js`, "text/javascript"),
+    toBlobURL(`${base}/814.ffmpeg.js`, "text/javascript")
+  ]);
+
+  /* FFmpeg's UMD bundle contains: new Worker(new URL(e.p+e.u(814),e.b),...)
+     Replace only that URL expression with the load() option workerLoadURL.
+     This is the workaround documented by the ffmpeg.wasm project. */
+  const raw = await (await fetch(`${base}/ffmpeg.js`, { mode: "cors", cache: "force-cache" })).text();
+  let code = raw;
+  const replacements = [
+    ["new URL(e.p+e.u(814),e.b)", "r.workerLoadURL"],
+    ["new URL(e.p + e.u(814), e.b)", "r.workerLoadURL"]
+  ];
+  let patched = false;
+  for (const [from, to] of replacements) {
+    if (code.includes(from)) {
+      code = code.split(from).join(to);
+      patched = true;
+      break;
     }
-
-    const script = document.createElement("script");
-    script.src = scriptURL;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => {
-      if (window.FFmpegWASM && window.FFmpegWASM.FFmpeg) {
-        resolve();
-      } else {
-        reject(new Error("FFmpeg se cargó, pero no expuso FFmpegWASM."));
-      }
-    };
-    script.onerror = () =>
-      reject(new Error("No se pudo cargar la librería FFmpeg desde CDN."));
-    document.head.appendChild(script);
-  });
-
-  if (!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg) {
-    throw new Error("FFmpeg WebAssembly no expuso FFmpegWASM.");
+  }
+  if (!patched) {
+    URL.revokeObjectURL(ffmpegURL);
+    URL.revokeObjectURL(workerURL);
+    throw new Error("FFmpeg 0.12.10 cambió su Worker 814 y no se pudo aplicar el parche.");
   }
 
+  const patchedURL = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+  window.__ineoffmpegWorkerURL = workerURL;
+  try {
+    await import(patchedURL);
+  } finally {
+    URL.revokeObjectURL(patchedURL);
+    URL.revokeObjectURL(ffmpegURL);
+  }
+
+  if (!window.FFmpegWASM || !window.FFmpegWASM.FFmpeg) {
+    URL.revokeObjectURL(workerURL);
+    throw new Error("FFmpeg WebAssembly no expuso FFmpegWASM.");
+  }
   return window.FFmpegWASM;
 })();
 </script>
@@ -1199,7 +1221,6 @@ window.__loadIneoFFmpegWASM = (async () => {
           </div>
         </div>
         <button class="btn primary exportBtn" id="exportBtn">⬇ Exportar MP4 · 720×1280</button>
-        <button class="btn" id="downloadMp4Btn" hidden style="margin-top:8px;width:100%;">⬇ Descargar MP4</button>
         <div class="ffmpegStatus" id="ffmpegStatus">FFmpeg WebAssembly se carga al exportar desde GitHub Pages. El Worker se adapta automáticamente para evitar CORS.</div>
       </div>
 
@@ -1319,8 +1340,6 @@ let exporting = false;
 let cancelExport = false;
 let recorder = null;
 let exportChunks = [];
-let lastExportBlob = null;
-let lastExportFilename = "";
 
 let volume = 1;
 let muted = false;
@@ -1420,7 +1439,7 @@ function isVideo(file){
   );
 }
 
-window.handleFile = function handleFile(file){
+function handleFile(file){
 
   if(!file){
     toast("No se encontró el archivo.");
@@ -3621,15 +3640,18 @@ async function loadFFmpeg(){
     }
   });
   const toBlobURL=async(url,mime)=>{
-    const r=await fetch(url);
-    if(!r.ok) throw new Error("No se pudo descargar "+url);
+    const r=await fetch(url,{mode:"cors",cache:"force-cache"});
+    if(!r.ok) throw new Error("No se pudo descargar "+url+" ("+r.status+")");
     const b=await r.blob();
     return URL.createObjectURL(new Blob([b],{type:mime}));
   };
   const base="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
   const coreURL=await toBlobURL(base+"/ffmpeg-core.js","text/javascript");
   const wasmURL=await toBlobURL(base+"/ffmpeg-core.wasm","application/wasm");
-  await ffmpeg.load({coreURL,wasmURL});
+  const workerLoadURL=window.__ineoffmpegWorkerURL;
+  if(!workerLoadURL) throw new Error("No se pudo preparar el Worker 814 de FFmpeg.");
+  await ffmpeg.load({workerLoadURL,coreURL,wasmURL});
+
   ffmpegInstance=ffmpeg;
   ffmpegLoaded=true;
   statusEl.textContent="FFmpeg listo. Exportación MP4 habilitada.";
@@ -3646,7 +3668,7 @@ function makeAudioFilter(){
   if(!segs.length) return null;
   const vol=muted?0:clamp(volume,0,2);
   const parts=segs.map((s,i)=>
-    `[1:a]atrim=start=${s.start.toFixed(4)}:end=${s.end.toFixed(4)},asetpts=PTS-STARTPTS,volume=${vol.toFixed(3)}[a${i}]`
+    `[0:a]atrim=start=${s.start.toFixed(4)}:end=${s.end.toFixed(4)},asetpts=PTS-STARTPTS,volume=${vol.toFixed(3)}[a${i}]`
   );
   if(segs.length===1) return {filter:parts[0]+";[a0]anull[aout]",map:"[aout]"};
   return {
@@ -3755,87 +3777,28 @@ async function startExport(){
 
     args.push("-movflags","+faststart",output);
 
-    // FFmpeg.wasm 0.12 returns an exit code; a failed command may leave no MP4
-    // and readFile() then throws the misleading "FS error".
-    let exitCode = await ffmpeg.exec(args);
-    if(cancelExport) return;
-    if(exitCode !== 0 && audio){
-      // Some source videos have no audio track. Retry without audio instead
-      // of leaving the user with an FS/readFile error.
-      try{ await ffmpeg.deleteFile(output); }catch(e){}
-      const videoOnlyArgs = [
-        "-i","render.webm",
-        "-r",String(fps),
-        "-s","720x1280",
-        "-c:v","libx264",
-        "-preset","ultrafast",
-        "-b:v",String(bitrate),
-        "-pix_fmt","yuv420p",
-        "-an",
-        "-movflags","+faststart",
-        output
-      ];
-      exitCode = await ffmpeg.exec(videoOnlyArgs);
-    }
-    if(exitCode !== 0){
-      throw new Error(`FFmpeg no pudo crear el MP4 (código ${exitCode}).`);
-    }
+    await ffmpeg.exec(args);
 
-    let files=[];
-    try{ files = await ffmpeg.listDir("/"); }catch(e){}
-    const outputExists = files.some(f => f.name === output);
-    if(!outputExists){
-      throw new Error("FFmpeg terminó sin crear el archivo MP4.");
-    }
+    if(cancelExport) return;
 
     const data=await ffmpeg.readFile(output);
-    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-    const blob=new Blob([bytes],{type:"video/mp4"});
-    const filename=`ineoclips-${layout}-720x1280-${fps}fps.mp4`;
-    lastExportBlob=blob;
-    lastExportFilename=filename;
-
-    // Keep a real user-visible download control. Browsers can block a
-    // programmatic download after a long async/WebAssembly operation.
-    const downloadBtn=$("#downloadMp4Btn");
-    if(downloadBtn){
-      downloadBtn.hidden=false;
-      downloadBtn.onclick=()=>{
-        const url=URL.createObjectURL(lastExportBlob);
-        const a=document.createElement("a");
-        a.href=url;
-        a.download=lastExportFilename;
-        a.rel="noopener";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),30000);
-      };
-    }
-
-    // Try the automatic download too; if Chrome blocks it, the visible
-    // "Descargar MP4" button remains available.
-    try{
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement("a");
-      a.href=url;
-      a.download=filename;
-      a.rel="noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),30000);
-    }catch(downloadErr){
-      console.warn("Descarga automática bloqueada; usar el botón Descargar MP4.",downloadErr);
-    }
+    const blob=new Blob([data.buffer],{type:"video/mp4"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`ineoclips-${layout}-720x1280-${fps}fps.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
 
     try{await ffmpeg.deleteFile(output);}catch(e){}
     try{await ffmpeg.deleteFile("render.webm");}catch(e){}
     try{await ffmpeg.deleteFile(inputName);}catch(e){}
 
-    toast("MP4 listo. Si no se descargó solo, pulsá «Descargar MP4».");
+    toast("MP4 exportado correctamente.");
     progressBar.style.width="100%";
-    progressText.textContent="100% · MP4 listo para descargar";
+    progressText.textContent="100% · Listo";
   }catch(err){
     console.error(err);
     toast("Error al exportar MP4: "+(err.message||"revisá la consola"));
@@ -4029,24 +3992,5 @@ updateVolume();
 })();
 </script>
 
-<script>
-(function(){
-  function bind(){
-    const input=document.getElementById("fileInput");
-    const status=document.getElementById("status");
-    if(!input || input.dataset.ineoFallbackBound) return;
-    input.dataset.ineoFallbackBound="1";
-    input.addEventListener("change",function(){
-      const file=this.files&&this.files[0];
-      if(!file) return;
-      try{
-        if(typeof window.handleFile==="function") window.handleFile(file);
-        else setTimeout(()=>{ if(typeof window.handleFile==="function") window.handleFile(file); else if(status) status.textContent="Error: el editor no terminó de inicializar."; },0);
-      }catch(err){ console.error("INEOCLIPS: error cargando archivo",err); if(status) status.textContent="Error al cargar: "+(err.message||err); }
-    },true);
-  }
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",bind,{once:true}); else bind();
-})();
-</script>
 </body>
 </html>
